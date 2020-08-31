@@ -1,0 +1,80 @@
+{
+   "abstract" : "Terminal UI Toolkit",
+   "author" : [
+      "Sanko Robinson <sanko@cpan.org>"
+   ],
+   "dynamic_config" : 0,
+   "generated_by" : "Minilla/v3.1.10, CPAN::Meta::Converter version 2.150010",
+   "license" : [
+      "artistic_2"
+   ],
+   "meta-spec" : {
+      "url" : "http://search.cpan.org/perldoc?CPAN::Meta::Spec",
+      "version" : 2
+   },
+   "name" : "Cancer",
+   "no_index" : {
+      "directory" : [
+         "t",
+         "xt",
+         "inc",
+         "share",
+         "eg",
+         "examples",
+         "author",
+         "builder"
+      ]
+   },
+   "prereqs" : {
+      "configure" : {
+         "requires" : {
+            "Module::Build::Tiny" : "0.035"
+         }
+      },
+      "develop" : {
+         "requires" : {
+            "Test::CPAN::Meta" : "0",
+            "Test::MinimumVersion::Fast" : "0.04",
+            "Test::PAUSE::Permissions" : "0.07",
+            "Test::Pod" : "1.41",
+            "Test::Spellunker" : "v0.2.7"
+         }
+      },
+      "runtime" : {
+         "requires" : {
+            "Carp" : "0",
+            "Fcntl" : "0",
+            "IO::Select" : "0",
+            "Moo" : "0",
+            "POSIX" : "0",
+            "PerlX::Define" : "0",
+            "Role::Tiny" : "0",
+            "Types::Standard" : "0",
+            "perl" : "5.022000",
+            "strictures" : "2"
+         }
+      },
+      "test" : {
+         "requires" : {
+            "Test2::Tools::Exception" : "0",
+            "Test2::V0" : "0"
+         }
+      }
+   },
+   "release_status" : "unstable",
+   "resources" : {
+      "bugtracker" : {
+         "web" : "https://github.com/sanko/Cancer.pm/issues"
+      },
+      "homepage" : "https://github.com/sanko/Cancer.pm",
+      "repository" : {
+         "type" : "git",
+         "url" : "git://github.com/sanko/Cancer.pm.git",
+         "web" : "https://github.com/sanko/Cancer.pm"
+      }
+   },
+   "version" : "1.0",
+   "x_authority" : "cpan:SANKO",
+   "x_serialization_backend" : "JSON::PP version 4.04",
+   "x_static_install" : 1
+}

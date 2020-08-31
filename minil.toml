@@ -1,0 +1,11 @@
+name = "Cancer"
+badges = ["travis-ci.com", "metacpan"]
+authority="cpan:SANKO"
+module_maker="ModuleBuildTiny"
+static_install = "auto"
+license="artistic_2"
+
+[release]
+hook=[
+    'tidyall -a'
+]
