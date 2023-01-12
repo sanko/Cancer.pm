@@ -1,31 +1,44 @@
-package Cancer 1.0 {
-    use strictures 2;
+package Cancer 0.01 {
+    use strict;
+    use warnings;
     use Fcntl qw[O_RDWR O_NDELAY O_NOCTTY];
     use POSIX qw[:termios_h];
     use IO::Select;
     use Carp qw[];
     #
-    use Moo;
+    use Moo;    # To be replaced by feature 'class' as soon as it's in a stable perl
     use Types::Standard qw[ArrayRef Bool CodeRef Enum HashRef FileHandle InstanceOf Int Num Str];
     use experimental 'signatures';
     use Role::Tiny qw[];
+    my $Win32 = $^O eq 'MSWin32' ? 1 : !1;
+
+    # https://gist.github.com/klaus03/e1910904104552765e6b
+    system 'chcp 65001 >NUL' if $Win32;
     #
+    use Cancer::Buffer;
     use Cancer::Cell;
     use Cancer::Colors;
     use Cancer::terminfo;
+    use Cancer::Event::Resize;
     #
-    has term => ( is => 'ro', isa => Str, default => '/dev/tty' );
-    has tty  => (
+    has term => ( is => 'ro', isa => Str, default => $Win32 ? fileno(STDOUT) : '/dev/tty' );
+    has tty => (
         is        => 'ro',
         isa       => FileHandle,
         required  => 1,
         predicate => 1,
-
-        #lazy      => 1,
-        builder => sub ($s) {
-            Carp::confess 'Not a terminal.' unless -t 1;
-            Carp::confess "Cannot open /dev/tty: $!"
-                unless sysopen my $tty_fh, $s->term, O_RDWR | O_NDELAY | O_NOCTTY;
+        lazy      => 1,
+        builder   => sub ($s) {
+            my $tty_fh;
+            if ($Win32) {
+                require IO::Handle;
+                $tty_fh = IO::Handle->new_from_fd( $s->term, '+<' );
+            }
+            else {
+                Carp::croak sprintf 'Cannot open %s: %s', $s->term, $!
+                    unless sysopen $tty_fh, $s->term, O_RDWR | O_NDELAY | O_NOCTTY;
+                Carp::croak 'Not a terminal.' unless -t $tty_fh;
+            }
             $tty_fh;
         }
     );
@@ -36,57 +49,61 @@ package Cancer 1.0 {
 
     sub BUILD ( $s, $args ) {
         Role::Tiny->apply_roles_to_object( $s, join '::', 'Cancer', 'terminfo', split '-',
-            $ENV{TERM} );
+            $ENV{TERM} // '' );
         #
         my $fileno = fileno( $s->tty );
+        if ($Win32) {
+            Role::Tiny->apply_roles_to_object( $s, 'Cancer::terminfo::xterm' );
 
-        # Keep an original copy
-        my $raw = POSIX::Termios->new();
-        $raw->getattr($fileno);
+            #Role::Tiny->apply_roles_to_object( $s, 'Cancer::Platform::Windows' );
+        }
+        else {
+            # Keep an original copy
+            my $raw = POSIX::Termios->new();
+            $raw->getattr($fileno);
 
-        # backup
-        $s->cflag( $raw->getcflag ) if !$s->has_cflag;
-        $s->iflag( $raw->getiflag ) if !$s->has_iflag;
-        $s->oflag( $raw->getoflag ) if !$s->has_oflag;
-        $s->lflag( $raw->getlflag ) if !$s->has_lflag;
+            # backup
+            $s->cflag( $raw->getcflag ) if !$s->has_cflag;
+            $s->iflag( $raw->getiflag ) if !$s->has_iflag;
+            $s->oflag( $raw->getoflag ) if !$s->has_oflag;
+            $s->lflag( $raw->getlflag ) if !$s->has_lflag;
 
-        # CORE::state
-        $cflag //= $raw->getcflag;
-        $iflag //= $raw->getiflag;
-        $oflag //= $raw->getoflag;
-        $lflag //= $raw->getlflag;
+            # CORE::state
+            $cflag //= $raw->getcflag;
+            $iflag //= $raw->getiflag;
+            $oflag //= $raw->getoflag;
+            $lflag //= $raw->getlflag;
 
-        # https://man7.org/linux/man-pages/man3/termios.3.html
-        $iflag = $iflag & ~( IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON );
-        $raw->setiflag($iflag);
-        $oflag = $oflag & ~OPOST;    # Disables post-processing output. Like turning \n into \r\n
-        $raw->setoflag($oflag);
-        $lflag = $lflag & ~( ECHO | ECHONL | ICANON | ISIG | IEXTEN );
-        $raw->setlflag($lflag);
-        $cflag = $cflag & ~( CSIZE | PARENB );
-        $cflag |= CS8;
-        $raw->setcflag($cflag);
+            # https://man7.org/linux/man-pages/man3/termios.3.html
+            $iflag = $iflag & ~( IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON );
+            $raw->setiflag($iflag);
+            $oflag = $oflag & ~OPOST;   # Disables post-processing output. Like turning \n into \r\n
+            $raw->setoflag($oflag);
+            $lflag = $lflag & ~( ECHO | ECHONL | ICANON | ISIG | IEXTEN );
+            $raw->setlflag($lflag);
+            $cflag = $cflag & ~( CSIZE | PARENB );
+            $cflag |= CS8;
+            $raw->setcflag($cflag);
 
-        # This is setup for blocking reads.  In the past we attempted to
-        # use non-blocking reads, but now a separate input loop and timer
-        # copes with the problems we had on some systems (BSD/Darwin)
-        # where close hung forever.
-        $raw->setcc( VMIN,  1 );
-        $raw->setcc( VTIME, 0 );
-        #
-        $s->sig_winch( $SIG{WINCH} ) if $SIG{WINCH};
-        $SIG{WINCH} = sub {
-            $s->sig_winch->() if $s->has_sig_winch;
-            my ( $rows, $cols ) = $s->get_win_size();
-            $s->winch_event( Cancer::Event::Resize->new( w => $cols, h => $rows ) );
-            $s;
-        };
-        $SIG{WINCH}->();
-        $raw->setattr( $fileno, TCSANOW );
+            # This is setup for blocking reads.  In the past we attempted to
+            # use non-blocking reads, but now a separate input loop and timer
+            # copes with the problems we had on some systems (BSD/Darwin)
+            # where close hung forever.
+            $raw->setcc( VMIN,  1 );
+            $raw->setcc( VTIME, 0 );
+            #
+            $s->sig_winch( $SIG{WINCH} ) if $SIG{WINCH};
+            $SIG{WINCH} = sub {
+                $s->sig_winch->() if $s->has_sig_winch;
+                my ( $rows, $cols ) = $s->get_win_size();
+                $s->winch_event( Cancer::Event::Resize->new( w => $cols, h => $rows ) );
+                $s;
+            };
+            $SIG{WINCH}->();
+            $raw->setattr( $fileno, TCSANOW );
+        }
         #
         # Todo: If the user's platform exists, load it
-        Role::Tiny->apply_roles_to_object( $s, 'Cancer::Platform::Windows' ) if $^O eq 'MSWin32';
-
         # Todo: If the user has AnyEvnet, POE, or IO::Async loaded, use them
         Role::Tiny->apply_roles_to_object( $s, 'Cancer::IO::Select' );
     }
@@ -98,20 +115,23 @@ package Cancer 1.0 {
         $s->mouse(0)  if $s->mouse;
         #
         my $fileno = fileno( $s->tty );
+        if ($Win32) {
+        }
+        else {
+            # Restore original copy
+            my $raw = POSIX::Termios->new();
+            $raw->getattr($fileno);
+            $raw->setcflag( $s->cflag ) if $s->has_cflag;
+            $raw->setiflag( $s->iflag ) if $s->has_iflag;
+            $raw->setoflag( $s->oflag ) if $s->has_oflag;
+            $raw->setlflag( $s->lflag ) if $s->has_lflag;
+            #
+            $raw->setattr( $fileno, TCSANOW );
 
-        # Restore original copy
-        my $raw = POSIX::Termios->new();
-        $raw->getattr($fileno);
-        $raw->setcflag( $s->cflag ) if $s->has_cflag;
-        $raw->setiflag( $s->iflag ) if $s->has_iflag;
-        $raw->setoflag( $s->oflag ) if $s->has_oflag;
-        $raw->setlflag( $s->lflag ) if $s->has_lflag;
-        #
-        $raw->setattr( $fileno, TCSANOW );
-
-        #$s
-        $SIG{WINCH} = $s->sig_winch if $s->has_sig_winch;    # Restore original winch
-        close $s->tty;
+            #$s
+            $SIG{WINCH} = $s->sig_winch if $s->has_sig_winch;    # Restore original winch
+            close $s->tty;
+        }
     }
     has [qw[back_buffer front_buffer]] => (
         is  => 'ro',
@@ -127,7 +147,7 @@ package Cancer 1.0 {
         is      => 'rwp',
         isa     => ArrayRef [ ArrayRef [ InstanceOf ['Cancer::Cell'] ] ],
         lazy    => 1,
-        builder => sub($s) {
+        builder => sub ($s) {
             [   map {
                     [ map { Cancer::Cell->new() } 1 .. $s->width ]
                 } 1 .. $s->height
@@ -160,40 +180,13 @@ package Cancer 1.0 {
         $s->front_buffer->data( $s->front_buffer->data . $data );
     }
 
-=head2 C<hide_cursor( )>
-
-
-=cut
-
-    sub hide_cursor($s) {
+    sub hide_cursor ($s) {
         syswrite $s->tty, "\e[?25l"    # immediate
     }
 
-=head2 C<show_cursor( )>
-
-
-=cut
-
-    sub show_cursor($s) {
+    sub show_cursor ($s) {
         syswrite $s->tty, "\e[0H\e[0J\e[?25h"    # immediate
     }
-
-=head2 C<mouse( [...] )>
-
-	$term->mouse;
-
-Returns a boolean value. True if the mouse is enabled.
-
-	$term->mouse( 1 );
-
-Enable the mouse.
-
-	$term->mouse( 0 );
-
-Disable the mouse.
-
-=cut
-
     has mouse => (
         is      => 'rw',
         isa     => Bool,
@@ -214,48 +207,14 @@ Disable the mouse.
         },
     );
 
-    sub clear_screen($s) {
+    sub clear_screen ($s) {
         $s->front_buffer->data( $s->front_buffer->data . "\033[2J\033[" . $s->height . ";3H" );
     }
 
     #has color_mode => ();
-    sub out ( $s, $string ) {    # Red and blinking
-        my $fg = 0xE6E6FA;
-        my $bg = 0xEE82EE;
-        $s->front_buffer->data( $s->front_buffer->data . "\e[38;2;" );
-        $s->front_buffer->data( $s->front_buffer->data . ( $fg >> 16 & 0xFF ) );    # fg R
-        $s->front_buffer->data( $s->front_buffer->data . ';' );
-        $s->front_buffer->data( $s->front_buffer->data . ( $fg >> 8 & 0xFF ) );     # fg G
-        $s->front_buffer->data( $s->front_buffer->data . ';' );
-        $s->front_buffer->data( $s->front_buffer->data . ( $fg & 0xFF ) );          # fg B
-        $s->front_buffer->data( $s->front_buffer->data . 'm' );
-        $s->front_buffer->data( $s->front_buffer->data . "\e[48;2;" );
-        $s->front_buffer->data( $s->front_buffer->data . ( $bg >> 16 & 0xFF ) );    # bg R
-        $s->front_buffer->data( $s->front_buffer->data . ';' );
-        $s->front_buffer->data( $s->front_buffer->data . ( $bg >> 8 & 0xFF ) );     # bg B
-        $s->front_buffer->data( $s->front_buffer->data . ';' );
-        $s->front_buffer->data( $s->front_buffer->data . ( $bg & 0xFF ) );          #bg G
-
-        #$s->front_buffer->data( $s->front_buffer->data .  '')
-        #$s->front_buffer->data( $s->front_buffer->data .  );
-        #$s->front_buffer->data( $s->front_buffer->data .  );
-        #$s->front_buffer->data( $s->front_buffer->data .  );
-        #	// write RGB color to buffer
-        #WRITE_INT(fg >> 8 & 0xFF);  // fg G
-        #WRITE_LITERAL(";");
-        #WRITE_INT(fg & 0xFF);       // fg B
-        #WRITE_LITERAL(";48;2;");
-        #WRITE_INT(bg >> 16 & 0xFF); // bg R
-        #WRITE_LITERAL(";");
-        #WRITE_INT(bg >> 8 & 0xFF);  // bg G
-        #WRITE_LITERAL(";");
-        #WRITE_INT(bg & 0xFF);       // bg B
-        $s->front_buffer->data( $s->front_buffer->data . 'm' . $string . "\033[25;0m\n" );
-    }
     has _unused_data => ( is => 'rw', isa => Str, default => '', predicate => 1 );
 
-
-    sub __readURXVT(@bytes) {
+    sub __readURXVT {
         my $c = chr( $_[0] );
         my $str;
         while ( $c ne ';' && $c ne 'M' ) {
@@ -265,7 +224,7 @@ Disable the mouse.
         return $str;
     }
 
-    sub _parseEventsFromInput($s) {
+    sub _parseEventsFromInput ($s) {
         if ( $s->has_winch_event ) {
             my $retval = $s->winch_event;
             $s->clear_winch_event( () );
@@ -382,7 +341,7 @@ Disable the mouse.
         #Fallback: split ' ', qx[stty size </dev/tty 2>/dev/null];
     }
 
-    sub resize($s) {
+    sub resize ($s) {
 
         # Force the terminal to a new size
     }
@@ -397,27 +356,20 @@ Disable the mouse.
         $s->render;
     }
 
-=head2 C<cls( )>
-
-Immediatly clears the screen.
-
-=cut
-
-    sub cls($s) {
-        syswrite $s->tty, $s->Clear;
+    sub cls ($s) {
+        if ($Win32) {
+            $s->tty->syswrite( $s->Clear );
+        }
+        else {
+            syswrite $s->tty, $s->Clear;
+        }
 
         #$s->
         #$s->front_buffer->data( $s->front_buffer->data . $s->Clear );
         #$s->render;    # No waiting
     }
 
-=head2 C<render( )>
-
-Syncronizes the internal back buffer with the terminal. ...it makes things show up on screen.
-
-=cut
-
-    sub render($s) {
+    sub render ($s) {
         my ( $x, $y, $w, $i );
         my $data = '';
         my ( $back, $front );    # = Cell->new();
@@ -442,13 +394,6 @@ Syncronizes the internal back buffer with the terminal. ...it makes things show 
         #ddx $cell;
         #die;
     }
-
-=head2 C<title( $title )>
-
-Immediatly sets the terminal's title.
-
-=cut
-
     has title => (
         is      => 'rw',
         isa     => Str,
@@ -458,33 +403,31 @@ Immediatly sets the terminal's title.
         predicate => 1
     );
 
-    sub clear_buffer($s) {
+    sub clear_buffer ($s) {
     }    # Clears the internal buffer using TB_DEFAULT or the default_bg and default_fg
     has [qw[default_bg default_fg]] =>
         ( is => 'rw', isa => Int, default => Cancer::Colors::TB_DEFAULT() );
 
     # Platform utils
-    sub TIOCGWINSZ($s) {    # See Perl::osnames
+    sub TIOCGWINSZ ($s) {    # See Perl::osnames
         return 0x800c if $^O =~ qr/\A(?:beos)\z/;
         return 0x40087468
             if $^O =~ qr/\A(?:MacOS|iphoneos|bitrig|dragonfly|(free|net|open)bsd|bsdos)\z/;
         return 0x5468 if $^O =~ qr/\A(?:solaris|sunos)\z/;
-        return 0x5413       # Linux and android
+        return 0x5413        # Linux and android
     }
 
-=cut
+=pod
 
-has terminfo; # TODO:
-		has h   (isa => Int, default => $ENV{LINES}  //0);
-		has w   (isa => Int, default => $ENV{COLUMNS}//0);
-		has done(isa => Bool);
-		#
-		has tty(isa => FileHandle, is => rw );
-		has buffering (isa => Bool ); # True if we are collecting writes to a buffer instead of sending directly
-		has buffer(isa => Maybe[Str]);
-		#
-		has curstyle (isa => InstanceOf['Cancer::Style']);
-		has style(isa => InstanceOf['Cancer::Style']);
+=begin todo
+
+has terminfo; # TODO:       has h   (isa => Int, default => $ENV{LINES}  //0);
+ has w   (isa => Int, default => $ENV{COLUMNS}//0);      has done(isa => Bool);
+     #       has tty(isa => FileHandle, is => rw );      has buffering (isa =>
+Bool ); # True if we are collecting writes to a buffer instead of sending
+directly        has buffer(isa => Maybe[Str]);      #       has curstyle (isa
+=> InstanceOf['Cancer::Style']);      has style(isa =>
+InstanceOf['Cancer::Style']);
 
 		# Events
 		has evch (isa => InstanceOf['Cancer::Event']);
@@ -564,6 +507,8 @@ has terminfo; # TODO:
         method has_key( Key $key) { }
         method beep() { }
 
+=end todo
+
 =cut
 
 };
@@ -573,7 +518,7 @@ has terminfo; # TODO:
 
 =head1 NAME
 
-Cancer - Terminal UI Toolkit
+Cancer - It's Terminal
 
 =head1 SYNOPSIS
 
@@ -581,17 +526,83 @@ Cancer - Terminal UI Toolkit
 
 =head1 DESCRIPTION
 
-Cancer is ...
+Cancer is a text-based UI library inspired by
+L<termbox-go|https://github.com/nsf/termbox-go>. Use it to create
+L<TUI|https://en.wikipedia.org/wiki/Text-based_user_interface> in pure perl.
 
-=head1 LICENSE
+=head1 Functions
 
-Copyright (C) Sanko Robinson.
+Cancer is needlessly object oriented so you'll need the following constructor
+first...
 
-This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself.
+=head2 C<new( [...] )>
 
-=head1 AUTHOR
+    my $term = Cancer->new( '/dev/ttyS06' ); # Don't do this
 
-Sanko Robinson E<lt>sanko@cpan.orgE<gt>
+Creates a new Cancer object.
+
+The optional parameter is the tty you'd like to bind to and defaults to
+C</dev/tty>.
+
+All setup is automatically done for your platform. This constructor will croak
+on failure (such as not being in a supported terminal).
+
+=head2 C<hide_cursor( )>
+
+=head2 C<show_cursor( )>
+
+
+=head2 C<mouse( [...] )>
+
+	$term->mouse;
+
+Returns a boolean value. True if the mouse is enabled.
+
+	$term->mouse( 1 );
+
+Enable the mouse.
+
+	$term->mouse( 0 );
+
+Disable the mouse.
+
+=head2 C<cls( )>
+
+Immediatly clears the screen.
+
+=head2 C<render( )>
+
+Syncronizes the internal back buffer with the terminal. ...it makes things show
+up on screen.
+
+=head2 C<title( $title )>
+
+Immediatly sets the terminal's title.
+
+=head1 Author
+
+Sanko Robinson E<lt>sanko@cpan.orgE<gt> - http://sankorobinson.com/
+
+CPAN ID: SANKO
+
+=head1 License and Legal
+
+Copyright (C) 2020-2023 by Sanko Robinson E<lt>sanko@cpan.orgE<gt>
+
+This program is free software; you can redistribute it and/or modify it under
+the terms of The Artistic License 2.0. See
+http://www.perlfoundation.org/artistic_license_2_0.  For clarification, see
+http://www.perlfoundation.org/artistic_2_0_notes.
+
+When separated from the distribution, all POD documentation is covered by the
+Creative Commons Attribution-Share Alike 3.0 License. See
+http://creativecommons.org/licenses/by-sa/3.0/us/legalcode.  For clarification,
+see http://creativecommons.org/licenses/by-sa/3.0/us/.
+
+=begin stopwords
+
+termbox tty
+
+=end stopwords
 
 =cut

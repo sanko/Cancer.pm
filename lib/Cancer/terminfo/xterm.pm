@@ -1,6 +1,8 @@
 package Cancer::terminfo::xterm {
-    use strictures 2;
-    use Data::Dump;
+    use strict;
+    use warnings;
+
+    #use Data::Dump;
     use Fcntl qw[O_RDWR O_NDELAY O_NOCTTY];
     use POSIX qw[:termios_h];
     use IPC::Open2;

@@ -1,10 +1,11 @@
 {
-   "abstract" : "Terminal UI Toolkit",
+   "X_No_Archive" : "Yes",
+   "abstract" : "It's Terminal",
    "author" : [
-      "Sanko Robinson <sanko@cpan.org>"
+      "Sanko Robinson <sanko@cpan.org> - http://sankorobinson.com/"
    ],
    "dynamic_config" : 0,
-   "generated_by" : "Minilla/v3.1.10, CPAN::Meta::Converter version 2.150010",
+   "generated_by" : "Minilla/v3.1.20, CPAN::Meta::Converter version 2.150010",
    "license" : [
       "artistic_2"
    ],
@@ -47,11 +48,9 @@
             "IO::Select" : "0",
             "Moo" : "0",
             "POSIX" : "0",
-            "PerlX::Define" : "0",
             "Role::Tiny" : "0",
             "Types::Standard" : "0",
-            "perl" : "5.022000",
-            "strictures" : "2"
+            "perl" : "5.022000"
          }
       },
       "test" : {
@@ -69,12 +68,12 @@
       "homepage" : "https://github.com/sanko/Cancer.pm",
       "repository" : {
          "type" : "git",
-         "url" : "git://github.com/sanko/Cancer.pm.git",
+         "url" : "https://github.com/sanko/Cancer.pm.git",
          "web" : "https://github.com/sanko/Cancer.pm"
       }
    },
-   "version" : "1.0",
+   "version" : "0.01",
    "x_authority" : "cpan:SANKO",
-   "x_serialization_backend" : "JSON::PP version 4.04",
+   "x_serialization_backend" : "JSON::PP version 4.12",
    "x_static_install" : 1
 }

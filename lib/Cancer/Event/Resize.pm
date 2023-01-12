@@ -1,4 +1,4 @@
-package Cancer::Event::Resize 1.0 {
+package Cancer::Event::Resize 0.01 {
     use Moo;
     extends 'Cancer::Event';
     use Types::Standard qw[Int Num Str];

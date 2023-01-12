@@ -1,19 +1,60 @@
-[![Build Status](https://travis-ci.com/sanko/Cancer.pm.svg?branch=master)](https://travis-ci.com/sanko/Cancer.pm) [![MetaCPAN Release](https://badge.fury.io/pl/Cancer.svg)](https://metacpan.org/release/Cancer)
+[![Actions Status](https://github.com/sanko/Cancer.pm/actions/workflows/ci.yaml/badge.svg)](https://github.com/sanko/Cancer.pm/actions) [![MetaCPAN Release](https://badge.fury.io/pl/Cancer.svg)](https://metacpan.org/release/Cancer)
+# NAME
+
+Cancer - It's Terminal
+
+# SYNOPSIS
+
+```perl
+use Cancer;
+```
+
+# DESCRIPTION
+
+Cancer is a text-based UI library inspired by
+[termbox-go](https://github.com/nsf/termbox-go). Use it to create
+[TUI](https://en.wikipedia.org/wiki/Text-based_user_interface) in pure perl.
+
+# Functions
+
+Cancer is needlessly object oriented so you'll need the following constructor
+first...
+
+## `new( [...] )`
+
+```perl
+my $term = Cancer->new( '/dev/ttyS06' ); # Don't do this
+```
+
+Creates a new Cancer object.
+
+The optional parameter is the tty you'd like to bind to and defaults to
+`/dev/tty`.
+
+All setup is automatically done for your platform. This constructor will croak
+on failure (such as not being in a supported terminal).
+
 ## `hide_cursor( )`
 
 ## `show_cursor( )`
 
 ## `mouse( [...] )`
 
-        $term->mouse;
+```perl
+    $term->mouse;
+```
 
 Returns a boolean value. True if the mouse is enabled.
 
-        $term->mouse( 1 );
+```perl
+    $term->mouse( 1 );
+```
 
 Enable the mouse.
 
-        $term->mouse( 0 );
+```perl
+    $term->mouse( 0 );
+```
 
 Disable the mouse.
 
@@ -23,43 +64,29 @@ Immediatly clears the screen.
 
 ## `render( )`
 
-Syncronizes the internal back buffer with the terminal. ...it makes things show up on screen.
+Syncronizes the internal back buffer with the terminal. ...it makes things show
+up on screen.
 
 ## `title( $title )`
 
 Immediatly sets the terminal's title.
 
-# NAME
+# Author
 
-Cancer - Terminal UI Toolkit
+Sanko Robinson <sanko@cpan.org> - http://sankorobinson.com/
 
-# SYNOPSIS
+CPAN ID: SANKO
 
-    use Cancer;
+# License and Legal
 
-# DESCRIPTION
+Copyright (C) 2020-2023 by Sanko Robinson <sanko@cpan.org>
 
-Cancer is ...
+This program is free software; you can redistribute it and/or modify it under
+the terms of The Artistic License 2.0. See
+http://www.perlfoundation.org/artistic\_license\_2\_0.  For clarification, see
+http://www.perlfoundation.org/artistic\_2\_0\_notes.
 
-# LICENSE
-
-Copyright (C) Sanko Robinson.
-
-This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself.
-
-# AUTHOR
-
-Sanko Robinson <sanko@cpan.org>
-
-# POD ERRORS
-
-Hey! **The above document had some coding errors, which are explained below:**
-
-- Around line 541:
-
-    &#x3d;cut found outside a pod block.  Skipping to next block.
-
-- Around line 634:
-
-    &#x3d;cut found outside a pod block.  Skipping to next block.
+When separated from the distribution, all POD documentation is covered by the
+Creative Commons Attribution-Share Alike 3.0 License. See
+http://creativecommons.org/licenses/by-sa/3.0/us/legalcode.  For clarification,
+see http://creativecommons.org/licenses/by-sa/3.0/us/.

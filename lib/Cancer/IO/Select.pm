@@ -1,5 +1,6 @@
-package Cancer::IO::Select 1.0 {    # Internal, Pure Perl event loop
-    use strictures 2;
+package Cancer::IO::Select 0.01 {    # Internal, Pure Perl event loop
+    use strict;
+    use warnings;
     use Moo::Role;
     use Types::Standard qw[InstanceOf];
     use IO::Select;
