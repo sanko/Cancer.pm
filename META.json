@@ -1,11 +1,11 @@
 {
    "X_No_Archive" : "Yes",
-   "abstract" : "It's Terminal",
+   "abstract" : "I'm afraid it's terminal...",
    "author" : [
       "Sanko Robinson <sanko@cpan.org> - http://sankorobinson.com/"
    ],
    "dynamic_config" : 0,
-   "generated_by" : "Minilla/v3.1.20, CPAN::Meta::Converter version 2.150010",
+   "generated_by" : "Minilla/v3.1.23, CPAN::Meta::Converter version 2.150010",
    "license" : [
       "artistic_2"
    ],
@@ -22,23 +22,47 @@
          "share",
          "eg",
          "examples",
-         "author",
-         "builder"
+         "author"
       ]
    },
    "prereqs" : {
       "configure" : {
          "requires" : {
-            "Module::Build::Tiny" : "0.035"
+            "Archive::Tar" : "0",
+            "CPAN::Meta" : "0",
+            "Devel::CheckBin" : "0",
+            "ExtUtils::Config" : "0.003",
+            "ExtUtils::Helpers" : "0.02",
+            "ExtUtils::Install" : "0",
+            "ExtUtils::InstallPaths" : "0.002",
+            "File::Basename" : "0",
+            "File::Find" : "0",
+            "File::Path" : "0",
+            "File::Spec::Functions" : "0",
+            "Getopt::Long" : "2.36",
+            "IO::Uncompress::Unzip" : "0",
+            "JSON::PP" : "2",
+            "Module::Build::Tiny" : "0.035",
+            "Path::Tiny" : "0.144"
          }
       },
       "develop" : {
          "requires" : {
+            "CPAN::Uploader" : "0",
+            "Code::TidyAll" : "0",
+            "Code::TidyAll::Plugin::ClangFormat" : "0",
+            "Code::TidyAll::Plugin::PodTidy" : "0",
+            "Minilla" : "0",
+            "Perl::Tidy" : "0",
+            "Pod::Markdown::Github" : "0",
+            "Pod::Tidy" : "0",
+            "Software::License::Artistic_2_0" : "0",
             "Test::CPAN::Meta" : "0",
             "Test::MinimumVersion::Fast" : "0.04",
             "Test::PAUSE::Permissions" : "0.07",
             "Test::Pod" : "1.41",
-            "Test::Spellunker" : "v0.2.7"
+            "Test::Spellunker" : "v0.2.7",
+            "Version::Next" : "0"
          }
       },
       "runtime" : {
@@ -50,7 +74,7 @@
             "POSIX" : "0",
             "Role::Tiny" : "0",
             "Types::Standard" : "0",
-            "perl" : "5.022000"
+            "perl" : "v5.38.0"
          }
       },
       "test" : {
@@ -73,7 +97,6 @@
       }
    },
    "version" : "0.01",
-   "x_authority" : "cpan:SANKO",
-   "x_serialization_backend" : "JSON::PP version 4.12",
+   "x_serialization_backend" : "JSON::PP version 4.16",
    "x_static_install" : 1
 }

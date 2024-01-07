@@ -1,6 +1,9 @@
 package Cancer 0.01 {
-    use strict;
-    use warnings;
+    use v5.38;
+    no warnings 'experimental::class', 'experimental::builtin', 'experimental::for_list';    # Be quiet.
+    use feature 'class';
+    use experimental 'try';
+    #
     use Fcntl qw[O_RDWR O_NDELAY O_NOCTTY];
     use POSIX qw[:termios_h];
     use IO::Select;
@@ -35,8 +38,7 @@ package Cancer 0.01 {
                 $tty_fh = IO::Handle->new_from_fd( $s->term, '+<' );
             }
             else {
-                Carp::croak sprintf 'Cannot open %s: %s', $s->term, $!
-                    unless sysopen $tty_fh, $s->term, O_RDWR | O_NDELAY | O_NOCTTY;
+                Carp::croak sprintf 'Cannot open %s: %s', $s->term, $! unless sysopen $tty_fh, $s->term, O_RDWR | O_NDELAY | O_NOCTTY;
                 Carp::croak 'Not a terminal.' unless -t $tty_fh;
             }
             $tty_fh;
@@ -48,8 +50,7 @@ package Cancer 0.01 {
     has [qw[cflag iflag oflag lflag]] => ( is => 'rw', isa => Int, predicate => 1 );
 
     sub BUILD ( $s, $args ) {
-        Role::Tiny->apply_roles_to_object( $s, join '::', 'Cancer', 'terminfo', split '-',
-            $ENV{TERM} // '' );
+        Role::Tiny->apply_roles_to_object( $s, join '::', 'Cancer', 'terminfo', split '-', $ENV{TERM} // '' );
         #
         my $fileno = fileno( $s->tty );
         if ($Win32) {
@@ -77,7 +78,7 @@ package Cancer 0.01 {
             # https://man7.org/linux/man-pages/man3/termios.3.html
             $iflag = $iflag & ~( IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON );
             $raw->setiflag($iflag);
-            $oflag = $oflag & ~OPOST;   # Disables post-processing output. Like turning \n into \r\n
+            $oflag = $oflag & ~OPOST;    # Disables post-processing output. Like turning \n into \r\n
             $raw->setoflag($oflag);
             $lflag = $lflag & ~( ECHO | ECHONL | ICANON | ISIG | IEXTEN );
             $raw->setlflag($lflag);
@@ -108,8 +109,7 @@ package Cancer 0.01 {
         Role::Tiny->apply_roles_to_object( $s, 'Cancer::IO::Select' );
     }
 
-    sub DEMOLISH ( $s, $global = 0 )
-    {    # TODO: Reset everything else we've done so far like enable mouse
+    sub DEMOLISH ( $s, $global = 0 ) {    # TODO: Reset everything else we've done so far like enable mouse
         return        if !$s->has_tty;
         $s->title('') if $s->has_title();
         $s->mouse(0)  if $s->mouse;
@@ -156,15 +156,9 @@ package Cancer 0.01 {
     );
 
     # Resize
-    has winch_event => (
-        is        => 'rw',
-        isa       => InstanceOf ['Cancer::Event'],
-        lazy      => 1,
-        predicate => 1,
-        clearer   => 1
-    );
-    has sig_winch => ( is => 'rwp', isa => CodeRef, lazy => 1, predicate => 1 );
-    has [qw[width height]] => ( is => 'ro', isa => Int, lazy => 1, builder => 1, clearer => 1 );
+    has winch_event        => ( is => 'rw',  isa => InstanceOf ['Cancer::Event'], lazy => 1, predicate => 1, clearer => 1 );
+    has sig_winch          => ( is => 'rwp', isa => CodeRef, lazy => 1, predicate => 1 );
+    has [qw[width height]] => ( is => 'ro',  isa => Int,     lazy => 1, builder   => 1, clearer => 1 );
 
     sub _build_width ($s) {
         my ( undef, $width ) = $s->get_win_size;
@@ -252,13 +246,10 @@ package Cancer 0.01 {
                 my $match = $b & 3;
                 my $event = Cancer::Event::Mouse->new();
                 if ( $match == 0 ) {
-                    $event->button( ( ( $b & 64 ) != 0 ) ? Cancer::Event::TB_KEY_MOUSE_WHEEL_UP() :
-                            Cancer::Event::TB_KEY_MOUSE_LEFT() );
+                    $event->button( ( ( $b & 64 ) != 0 ) ? Cancer::Event::TB_KEY_MOUSE_WHEEL_UP() : Cancer::Event::TB_KEY_MOUSE_LEFT() );
                 }
                 elsif ( $match == 1 ) {
-                    $event->button(
-                        ( ( $b & 64 ) != 0 ) ? Cancer::Event::TB_KEY_MOUSE_WHEEL_DOWN() :
-                            Cancer::Event::TB_KEY_MOUSE_MIDDLE() );
+                    $event->button( ( ( $b & 64 ) != 0 ) ? Cancer::Event::TB_KEY_MOUSE_WHEEL_DOWN() : Cancer::Event::TB_KEY_MOUSE_MIDDLE() );
                 }
                 elsif ( $match == 2 ) {
                     $event->button( Cancer::Event::TB_KEY_MOUSE_RIGHT() );
@@ -298,16 +289,13 @@ package Cancer 0.01 {
                 );
                 $event->x($2);
                 $event->y($3);
-                $event->mod( $4 eq 'M' ? Cancer::Event::TB_KEY_MOUSE_RELEASE() :
-                        Cancer::Event::TB_KEY_MOUSE_RELEASE() );
+                $event->mod( $4 eq 'M' ? Cancer::Event::TB_KEY_MOUSE_RELEASE() : Cancer::Event::TB_KEY_MOUSE_RELEASE() );
 
                 #warn $btn;
                 #warn length $s->_unused_data();
-                $s->write_at( 10, 12,
-                    'before: ' . length( $s->_unused_data() ) . '               ' );
+                $s->write_at( 10, 12, 'before: ' . length( $s->_unused_data() ) . '               ' );
                 $s->_unused_data( substr $s->_unused_data(), length $& );
-                $s->write_at( 10, 13,
-                    'after: ' . length( $s->_unused_data() ) . '               ' );
+                $s->write_at( 10, 13, 'after: ' . length( $s->_unused_data() ) . '               ' );
                 return $event;
             }
         }
@@ -319,8 +307,7 @@ package Cancer 0.01 {
         else {
             $s->_unused_data( substr $s->_unused_data(), 1 );
             $s->write_at( 10, 15, 'char:   ' . Data::Dump::pp( \@bytes ) . '               ' );
-            $s->write_at( 10, 16,
-                'unpack: ' . Data::Dump::pp( unpack 'C*', join '', @bytes ) . '               ' );
+            $s->write_at( 10, 16, 'unpack: ' . Data::Dump::pp( unpack 'C*', join '', @bytes ) . '               ' );
             return Cancer::Event::Key->new( glyph => join '', @bytes );
         }
         ();
@@ -405,15 +392,13 @@ package Cancer 0.01 {
 
     sub clear_buffer ($s) {
     }    # Clears the internal buffer using TB_DEFAULT or the default_bg and default_fg
-    has [qw[default_bg default_fg]] =>
-        ( is => 'rw', isa => Int, default => Cancer::Colors::TB_DEFAULT() );
+    has [qw[default_bg default_fg]] => ( is => 'rw', isa => Int, default => Cancer::Colors::TB_DEFAULT() );
 
     # Platform utils
     sub TIOCGWINSZ ($s) {    # See Perl::osnames
-        return 0x800c if $^O =~ qr/\A(?:beos)\z/;
-        return 0x40087468
-            if $^O =~ qr/\A(?:MacOS|iphoneos|bitrig|dragonfly|(free|net|open)bsd|bsdos)\z/;
-        return 0x5468 if $^O =~ qr/\A(?:solaris|sunos)\z/;
+        return 0x800c     if $^O =~ qr/\A(?:beos)\z/;
+        return 0x40087468 if $^O =~ qr/\A(?:MacOS|iphoneos|bitrig|dragonfly|(free|net|open)bsd|bsdos)\z/;
+        return 0x5468     if $^O =~ qr/\A(?:solaris|sunos)\z/;
         return 0x5413        # Linux and android
     }
 
@@ -518,7 +503,7 @@ InstanceOf['Cancer::Style']);
 
 =head1 NAME
 
-Cancer - It's Terminal
+Cancer - I'm afraid it's terminal...
 
 =head1 SYNOPSIS
 
@@ -526,14 +511,12 @@ Cancer - It's Terminal
 
 =head1 DESCRIPTION
 
-Cancer is a text-based UI library inspired by
-L<termbox-go|https://github.com/nsf/termbox-go>. Use it to create
+Cancer is a text-based UI library inspired by L<termbox-go|https://github.com/nsf/termbox-go>. Use it to create
 L<TUI|https://en.wikipedia.org/wiki/Text-based_user_interface> in pure perl.
 
 =head1 Functions
 
-Cancer is needlessly object oriented so you'll need the following constructor
-first...
+Cancer is needlessly object oriented so you'll need the following constructor first...
 
 =head2 C<new( [...] )>
 
@@ -541,11 +524,10 @@ first...
 
 Creates a new Cancer object.
 
-The optional parameter is the tty you'd like to bind to and defaults to
-C</dev/tty>.
+The optional parameter is the tty you'd like to bind to and defaults to C</dev/tty>.
 
-All setup is automatically done for your platform. This constructor will croak
-on failure (such as not being in a supported terminal).
+All setup is automatically done for your platform. This constructor will croak on failure (such as not being in a
+supported terminal).
 
 =head2 C<hide_cursor( )>
 
@@ -572,8 +554,7 @@ Immediatly clears the screen.
 
 =head2 C<render( )>
 
-Syncronizes the internal back buffer with the terminal. ...it makes things show
-up on screen.
+Syncronizes the internal back buffer with the terminal. ...it makes things show up on screen.
 
 =head2 C<title( $title )>
 
@@ -589,15 +570,13 @@ CPAN ID: SANKO
 
 Copyright (C) 2020-2023 by Sanko Robinson E<lt>sanko@cpan.orgE<gt>
 
-This program is free software; you can redistribute it and/or modify it under
-the terms of The Artistic License 2.0. See
-http://www.perlfoundation.org/artistic_license_2_0.  For clarification, see
+This program is free software; you can redistribute it and/or modify it under the terms of The Artistic License 2.0.
+See http://www.perlfoundation.org/artistic_license_2_0.  For clarification, see
 http://www.perlfoundation.org/artistic_2_0_notes.
 
-When separated from the distribution, all POD documentation is covered by the
-Creative Commons Attribution-Share Alike 3.0 License. See
-http://creativecommons.org/licenses/by-sa/3.0/us/legalcode.  For clarification,
-see http://creativecommons.org/licenses/by-sa/3.0/us/.
+When separated from the distribution, all POD documentation is covered by the Creative Commons Attribution-Share Alike
+3.0 License. See http://creativecommons.org/licenses/by-sa/3.0/us/legalcode.  For clarification, see
+http://creativecommons.org/licenses/by-sa/3.0/us/.
 
 =begin stopwords
 

@@ -1,7 +1,7 @@
-[![Actions Status](https://github.com/sanko/Cancer.pm/actions/workflows/ci.yaml/badge.svg)](https://github.com/sanko/Cancer.pm/actions) [![MetaCPAN Release](https://badge.fury.io/pl/Cancer.svg)](https://metacpan.org/release/Cancer)
+[![Actions Status](https://github.com/sanko/Cancer.pm/actions/workflows/linux.yaml/badge.svg)](https://github.com/sanko/Cancer.pm/actions) [![Actions Status](https://github.com/sanko/Cancer.pm/actions/workflows/windows.yaml/badge.svg)](https://github.com/sanko/Cancer.pm/actions) [![Actions Status](https://github.com/sanko/Cancer.pm/actions/workflows/osx.yaml/badge.svg)](https://github.com/sanko/Cancer.pm/actions) [![MetaCPAN Release](https://badge.fury.io/pl/Cancer.svg)](https://metacpan.org/release/Cancer)
 # NAME
 
-Cancer - It's Terminal
+Cancer - I'm afraid it's terminal...
 
 # SYNOPSIS
 
@@ -11,14 +11,12 @@ use Cancer;
 
 # DESCRIPTION
 
-Cancer is a text-based UI library inspired by
-[termbox-go](https://github.com/nsf/termbox-go). Use it to create
+Cancer is a text-based UI library inspired by [termbox-go](https://github.com/nsf/termbox-go). Use it to create
 [TUI](https://en.wikipedia.org/wiki/Text-based_user_interface) in pure perl.
 
 # Functions
 
-Cancer is needlessly object oriented so you'll need the following constructor
-first...
+Cancer is needlessly object oriented so you'll need the following constructor first...
 
 ## `new( [...] )`
 
@@ -28,11 +26,10 @@ my $term = Cancer->new( '/dev/ttyS06' ); # Don't do this
 
 Creates a new Cancer object.
 
-The optional parameter is the tty you'd like to bind to and defaults to
-`/dev/tty`.
+The optional parameter is the tty you'd like to bind to and defaults to `/dev/tty`.
 
-All setup is automatically done for your platform. This constructor will croak
-on failure (such as not being in a supported terminal).
+All setup is automatically done for your platform. This constructor will croak on failure (such as not being in a
+supported terminal).
 
 ## `hide_cursor( )`
 
@@ -64,8 +61,7 @@ Immediatly clears the screen.
 
 ## `render( )`
 
-Syncronizes the internal back buffer with the terminal. ...it makes things show
-up on screen.
+Syncronizes the internal back buffer with the terminal. ...it makes things show up on screen.
 
 ## `title( $title )`
 
@@ -81,12 +77,10 @@ CPAN ID: SANKO
 
 Copyright (C) 2020-2023 by Sanko Robinson <sanko@cpan.org>
 
-This program is free software; you can redistribute it and/or modify it under
-the terms of The Artistic License 2.0. See
-http://www.perlfoundation.org/artistic\_license\_2\_0.  For clarification, see
+This program is free software; you can redistribute it and/or modify it under the terms of The Artistic License 2.0.
+See http://www.perlfoundation.org/artistic\_license\_2\_0.  For clarification, see
 http://www.perlfoundation.org/artistic\_2\_0\_notes.
 
-When separated from the distribution, all POD documentation is covered by the
-Creative Commons Attribution-Share Alike 3.0 License. See
-http://creativecommons.org/licenses/by-sa/3.0/us/legalcode.  For clarification,
-see http://creativecommons.org/licenses/by-sa/3.0/us/.
+When separated from the distribution, all POD documentation is covered by the Creative Commons Attribution-Share Alike
+3.0 License. See http://creativecommons.org/licenses/by-sa/3.0/us/legalcode.  For clarification, see
+http://creativecommons.org/licenses/by-sa/3.0/us/.

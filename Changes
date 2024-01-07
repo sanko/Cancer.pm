@@ -3,4 +3,3 @@ Revision history for Perl extension Cancer
 {{$NEXT}}
 
     - Inoperable but handing it off to PAUSE anyway because it has been sitting on github for nearly 3 years
-

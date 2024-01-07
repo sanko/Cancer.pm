@@ -1,14 +1,24 @@
 name = "Cancer"
-badges = ["github-actions/ci.yaml", "metacpan"]
-authority="cpan:SANKO"
+badges = ["github-actions/linux.yaml", "github-actions/windows.yaml", "github-actions/osx.yaml", "metacpan"]
 module_maker="ModuleBuildTiny"
 static_install = "auto"
-license="artistic_2"
+license = "artistic_2"
 markdown_maker = "Pod::Markdown::Github"
 
 [release]
-hook=[
+hooks=[
     'tidyall -a'
+]
+
+[no_index]
+directory=[
+    "t",
+    "xt",
+    "inc",
+    "share",
+    "eg",
+    "examples",
+    "author"
 ]
 
 [Metadata]
