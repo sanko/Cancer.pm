@@ -94,11 +94,13 @@ package Cancer 0.01 {
                 $raw->setcc( VTIME, 0 );
                 #
                 $sig_winch = $SIG{WINCH} if $SIG{WINCH};
+                #<<V
                 $SIG{WINCH} = method {
                     $sig_winch->() if defined $sig_winch;
                     my ( $rows, $cols ) = $self->get_win_size();
                     return $self->winch_event( Cancer::Event::Resize->new( w => $cols, h => $rows ) );
                 };
+                #>>V
                 $SIG{WINCH}->($self);
                 $raw->setattr( $fileno, TCSANOW );
             }
