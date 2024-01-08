@@ -1,198 +1,190 @@
-package Cancer::terminfo 0.01 {
-    use strict;
-    use warnings FATAL => 'all';
-    use Fcntl qw[O_RDWR O_NDELAY O_NOCTTY];
-    use POSIX qw[:termios_h];
-    use IPC::Open2;
-    #
-    use Moo::Role;
-    use Types::Standard qw[Bool Enum HashRef FileHandle InstanceOf Int Num Str];
-    use experimental 'signatures';
-    use Role::Tiny qw[];
-    #
-    sub tparm ( $s, $format, @args ) {
-        my @chrs   = split '', $format;
-        my $retval = '';
-        my $chr    = '';
-        my @params = @args;
-        my @tf;    # True/False
-        my %dynamic;
-        CORE::state %static;
-        my $percent = 0;
-        my $nest    = 0;
-        CORE::state $dispatch;    # TODO: Pass args to dispatch so I may make this only define once
-        $dispatch = {
-            default => sub {
-                die "unknown encoding '%$chr";
-            },
-            '{' => sub {
-                my $int = '';
-                while (@chrs) {
-                    $chr = shift @chrs;
-                    if ( $chr !~ /\d/ ) {
-                        push @params, $int;
-                        return;
-                    }
-                    $int .= $chr;
-                }
-            },
-            '\'' => sub {
-                my $char = shift @chrs;
-                die 'Malformed' if shift @chrs ne '\'';
-                push @params, $char;
-                return;
-            },
-            '%' => sub { $retval .= '%' },
-            '+' => sub { push @params, ( pop(@params) + pop(@params) ) },
-            '-' => sub {
-                my $ib = pop @params;
-                my $ia = pop @params;
-                push @params, $ia - $ib;
-            },
-            '*' => sub { push @params, ( pop(@params) * pop(@params) ) },
-            '/' => sub {
-                my $ib = pop @params;
-                my $ia = pop @params;
-                push @params, $ia / $ib;
-            },
-            m => sub {
-                my $ib = pop @params;
-                my $ia = pop @params;
-                push @params, $ia % $ib;
-            },
-            '&' => sub {
-                my $ib = pop @params;
-                my $ia = pop @params;
-                push @params, $ia & $ib;
-            },
-            '|' => sub {
-                my $ib = pop @params;
-                my $ia = pop @params;
-                push @params, $ia | $ib;
-            },
-            '^' => sub {
-                my $ib = pop @params;
-                my $ia = pop @params;
-                push @params, $ia ^ $ib;
-            },
-            '=' => sub {
-                my $ib = pop @params;
-                my $ia = pop @params;
-                push @params, $ia == $ib;
-            },
-            '<' => sub {
-                my $ib = pop @params;
-                my $ia = pop @params;
-                push @params, $ia < $ib;
-            },
-            '>' => sub {
-                my $ib = pop @params;
-                my $ia = pop @params;
-                push @params, $ia > $ib;
-            },
-            c => sub { $retval .= sprintf '%c', shift @params },
-            d => sub { $retval .= sprintf '%d', shift @params },
-            s => sub { $retval .= sprintf '%s', shift @params },
-            p => sub {
-                my $ith = shift @chrs;
-                push @params,
-                    ( $params[ $ith - 1 ] // 0 )
-                    ;    #(scalar @params >= $ith - 1) ? $params[$ith-1] : 0;
-            },
-            P => sub {
-                my $name = shift @chrs;
-                ( $name eq lc $name ? $dynamic{$name} : $static{$name} ) = shift @params;
-            },
-            g => sub {
-                my $name = shift @chrs;
-                push @params, sprintf '%s',
-                    ( $name eq lc $name ? $dynamic{$name} : $static{$name} );
-            },
-            l => sub { push @params, length pop @params },
-            i => sub {
-
-                # TODO: Only do this for ANSI terminals
-                $params[0]++ if $params[0] =~ m[^\d$];
-                $params[1]++ if $params[1] =~ m[^\d$];
-            },
-            #
-            '!' => sub { push @params, !pop(@params) },
-            '~' => sub { push @params, pop(@params) ^ -1 },
-            A   => sub { my $y = pop @params; my $x = pop @params; push @params, $y && $x },
-            O   => sub { my $y = pop @params; my $x = pop @params; push @params, $y || $x },
-
-            # conditionals
-            '?' => sub { },    # nothing to do here
-            t   => sub {
-                push @tf, pop @params;
-                if ( $tf[-1] ) {
-                    return;    # just keep going
-                }
-                $nest = 0;
-            IFLOOP:
-                while (@chrs)
-                { # This loop consumes everything until we hit out else or the end of the conditional
-                    $chr = shift @chrs;
-                    $chr // die 'Malformed';
-                    next if $chr ne '%';
-                    $chr = shift @chrs;
-                    if ( $chr eq ';' ) {
-                        if ( $nest == 0 ) {
-                            last IFLOOP;
+package Cancer::terminfo {
+    use v5.38;
+    no warnings 'experimental::class', 'experimental::builtin', 'experimental::for_list';    # Be quiet.
+    use feature 'class';
+    use experimental 'try';
+    class Cancer::terminfo 0.01 {
+        field $static : param //= {};
+        #
+        method tparm ( $format, @args ) {
+            my @chrs   = split '', $format;
+            my $retval = '';
+            my $chr    = '';
+            my @params = @args;
+            my @tf;                   # True/False
+            my $dynamic = {};
+            my $percent = 0;
+            my $nest    = 0;
+            CORE::state $dispatch;    # TODO: Pass args to dispatch so I may make this only define once
+            $dispatch = {
+                default => sub {
+                    die "unknown encoding '%$chr";
+                },
+                '{' => sub {
+                    my $int = '';
+                    while (@chrs) {
+                        $chr = shift @chrs;
+                        if ( $chr !~ /\d/ ) {
+                            push @params, $int;
+                            return;
                         }
-                        $nest--;
+                        $int .= $chr;
                     }
-                    elsif ( $chr eq '?' ) {
-                        $nest++;
+                },
+                '\'' => sub {
+                    my $char = shift @chrs;
+                    die 'Malformed' if shift @chrs ne '\'';
+                    push @params, $char;
+                    return;
+                },
+                '%' => sub { $retval .= '%' },
+                '+' => sub { push @params, ( pop(@params) + pop(@params) ) },
+                '-' => sub {
+                    my $ib = pop @params;
+                    my $ia = pop @params;
+                    push @params, $ia - $ib;
+                },
+                '*' => sub { push @params, ( pop(@params) * pop(@params) ) },
+                '/' => sub {
+                    my $ib = pop @params;
+                    my $ia = pop @params;
+                    push @params, $ia / $ib;
+                },
+                m => sub {
+                    my $ib = pop @params;
+                    my $ia = pop @params;
+                    push @params, $ia % $ib;
+                },
+                '&' => sub {
+                    my $ib = pop @params;
+                    my $ia = pop @params;
+                    push @params, $ia & $ib;
+                },
+                '|' => sub {
+                    my $ib = pop @params;
+                    my $ia = pop @params;
+                    push @params, $ia | $ib;
+                },
+                '^' => sub {
+                    my $ib = pop @params;
+                    my $ia = pop @params;
+                    push @params, $ia ^ $ib;
+                },
+                '=' => sub {
+                    my $ib = pop @params;
+                    my $ia = pop @params;
+                    push @params, $ia == $ib;
+                },
+                '<' => sub {
+                    my $ib = pop @params;
+                    my $ia = pop @params;
+                    push @params, $ia < $ib;
+                },
+                '>' => sub {
+                    my $ib = pop @params;
+                    my $ia = pop @params;
+                    push @params, $ia > $ib;
+                },
+                c => sub { $retval .= sprintf '%c', shift @params },
+                d => sub { $retval .= sprintf '%d', shift @params },
+                s => sub { $retval .= sprintf '%s', shift @params },
+                p => sub {
+                    my $ith = shift @chrs;
+                    push @params, ( $params[ $ith - 1 ] // 0 );    #(scalar @params >= $ith - 1) ? $params[$ith-1] : 0;
+                },
+                P => sub {
+                    my $name = shift @chrs;
+                    ( $name eq lc $name ? $dynamic->{$name} : $static->{$name} ) = shift @params;
+                },
+                g => sub {
+                    my $name = shift @chrs;
+                    push @params, sprintf '%s', ( $name eq lc $name ? $dynamic->{$name} // '' : $static->{$name} // '' );
+                },
+                l => sub { push @params, length pop @params },
+                i => sub {
+
+                    # TODO: Only do this for ANSI terminals
+                    $params[0]++ if $params[0] =~ m[^\d$];
+                    $params[1]++ if $params[1] =~ m[^\d$];
+                },
+                #
+                '!' => sub { push @params, !pop(@params) },
+                '~' => sub { push @params, pop(@params) ^ -1 },
+                A   => sub { my $y = pop @params; my $x = pop @params; push @params, $y && $x },
+                O   => sub { my $y = pop @params; my $x = pop @params; push @params, $y || $x },
+
+                # conditionals
+                '?' => sub { },    # nothing to do here
+                t   => sub {
+                    push @tf, pop @params;
+                    if ( $tf[-1] ) {
+                        return;    # just keep going
                     }
-                    elsif ( $chr eq 'e' ) {
-                        if ( $nest == 0 ) {
-                            last IFLOOP;
+                    $nest = 0;
+                IFLOOP:
+                    while (@chrs) {    # This loop consumes everything until we hit out else or the end of the conditional
+                        $chr = shift @chrs;
+                        $chr // die 'Malformed';
+                        next if $chr ne '%';
+                        $chr = shift @chrs;
+                        if ( $chr eq ';' ) {
+                            if ( $nest == 0 ) {
+                                last IFLOOP;
+                            }
+                            $nest--;
+                        }
+                        elsif ( $chr eq '?' ) {
+                            $nest++;
+                        }
+                        elsif ( $chr eq 'e' ) {
+                            if ( $nest == 0 ) {
+                                last IFLOOP;
+                            }
                         }
                     }
-                }
-            },
-            e => sub {
+                },
+                e => sub {
 
-# If we got here, we didn't use the else in the 't' case above and should skip until the end of the  conditional
-                $nest = 0;
-            ELLOOP: while (@chrs) {
-                    $chr = shift @chrs;
-                    $chr // die 'Malformed';
-                    if ( $chr ne '%' ) {
-                        next;
-                    }
-                    $chr = shift @chrs;
-                    if ( $chr eq ';' ) {
-                        if ( $nest == 0 ) {
-                            last ELLOOP;
+                    # If we got here, we didn't use the else in the 't' case above and should skip until the end of the  conditional
+                    $nest = 0;
+                ELLOOP: while (@chrs) {
+                        $chr = shift @chrs;
+                        $chr // die 'Malformed';
+                        if ( $chr ne '%' ) {
+                            next;
                         }
-                        $nest--;
+                        $chr = shift @chrs;
+                        if ( $chr eq ';' ) {
+                            if ( $nest == 0 ) {
+                                last ELLOOP;
+                            }
+                            $nest--;
+                        }
+                        elsif ( $chr eq '?' ) {
+                            $nest++;
+                        }
                     }
-                    elsif ( $chr eq '?' ) {
-                        $nest++;
-                    }
+                },
+                ';' => sub {
+                    pop @tf;
                 }
-            },
-            ';' => sub {
-                pop @tf;
+            };
+            while (@chrs) {
+                $chr = shift @chrs;
+                if ( ( !$percent ) && $chr eq '%' ) {
+                    $percent++;
+                }
+                elsif ($percent) {
+                    ( $dispatch->{$chr} // $dispatch->{default} )->();
+                    $percent--;
+                }
+                else {
+                    $retval .= $chr if defined $chr;
+                }
             }
-        };
-        while (@chrs) {
-            $chr = shift @chrs;
-            if ( ( !$percent ) && $chr eq '%' ) {
-                $percent++;
-            }
-            elsif ($percent) {
-                ( $dispatch->{$chr} // $dispatch->{default} )->();
-                $percent--;
-            }
-            else {
-                $retval .= $chr if defined $chr;
-            }
+            return $retval;
         }
-        return $retval;
-    }
+    };
 }
 1;
 __END__

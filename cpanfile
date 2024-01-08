@@ -3,6 +3,7 @@ requires 'Fcntl';
 requires 'POSIX';
 requires 'IO::Select';
 requires 'Carp';
+requires 'Time::HiRes';
 
 # TODO: remove these!!!!
 requires 'Moo';

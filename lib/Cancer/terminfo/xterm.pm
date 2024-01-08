@@ -1,17 +1,10 @@
 package Cancer::terminfo::xterm {
-    use strict;
-    use warnings;
+    use v5.38;
+    no warnings 'experimental::class', 'experimental::builtin', 'experimental::for_list';    # Be quiet.
+    use feature 'class';
+    use experimental 'try';
 
-    #use Data::Dump;
-    use Fcntl qw[O_RDWR O_NDELAY O_NOCTTY];
-    use POSIX qw[:termios_h];
-    use IPC::Open2;
-    #
-    use Moo::Role;
-    use Types::Standard qw[Bool Enum HashRef FileHandle InstanceOf Int Num Str];
-    use experimental 'signatures';
-    use Role::Tiny qw[];
-    with 'Cancer::terminfo';
-    #
+    class Cancer::terminfo::xterm : isa(Cancer::terminfo) {
+    }
 }
 1;

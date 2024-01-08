@@ -7,44 +7,271 @@ package Cancer 0.01 {
     use Fcntl qw[O_RDWR O_NDELAY O_NOCTTY];
     use POSIX qw[:termios_h];
     use IO::Select;
-    use Carp qw[];
+    use Time::HiRes;
+    use Carp qw[croak];
     #
-    use Moo;    # To be replaced by feature 'class' as soon as it's in a stable perl
-    use Types::Standard qw[ArrayRef Bool CodeRef Enum HashRef FileHandle InstanceOf Int Num Str];
-    use experimental 'signatures';
-    use Role::Tiny qw[];
     my $Win32 = $^O eq 'MSWin32' ? 1 : !1;
 
     # https://gist.github.com/klaus03/e1910904104552765e6b
     system 'chcp 65001 >NUL' if $Win32;
     #
-    use Cancer::Buffer;
-    use Cancer::Cell;
     use Cancer::Colors;
     use Cancer::terminfo;
-    use Cancer::Event::Resize;
+    use Cancer::terminfo::xterm::256color;
     #
-    has term => ( is => 'ro', isa => Str, default => $Win32 ? fileno(STDOUT) : '/dev/tty' );
-    has tty => (
-        is        => 'ro',
-        isa       => FileHandle,
-        required  => 1,
-        predicate => 1,
-        lazy      => 1,
-        builder   => sub ($s) {
-            my $tty_fh;
+    class Cancer {
+        field $term : param     //= $Win32 ? fileno(STDOUT) : '/dev/tty';
+        field $tty : param      //= ();
+        field $type : param     //= 'Cancer::terminfo::xterm::256color';
+        field $terminfo : param //= '';
+        #
+        field $front_buffer : param //= ();
+        field $back_buffer : param  //= ();
+        method front_buffer {$front_buffer}
+        method back_buffer  {$back_buffer}
+        field $width : param  //= ();
+        field $height : param //= ();
+
+        # events
+        field $winch : param //= ();
+
+        # Restore state
+        field $cflag;
+        field $iflag;
+        field $oflag;
+        field $lflag;
+        field $sig_winch;
+        #
+        ADJUST {
+            if ( !defined $tty ) {
+                if ($Win32) {
+                    require IO::Handle;
+                    $tty = IO::Handle->new_from_fd( $term, '+<' );
+                }
+                else {
+                    croak sprintf 'Cannot open %s: %s', $term, $! unless sysopen $tty, $term, O_RDWR | O_NDELAY | O_NOCTTY;
+                    croak 'Not a terminal.' unless -t $tty;
+                }
+            }
+            $terminfo = $type->new;
+            if ( !defined $height || !defined $width ) {
+                my ( $w, $h ) = $self->get_win_size();
+                $width  //= $w;
+                $height //= $h;
+            }
+            $front_buffer //= Cancer::Buffer->new( width => $width, height => $height );
+            $back_buffer  //= Cancer::Buffer->new( width => $width, height => $height );
+            if ($Win32) { }
+            else {
+                my $fileno = fileno $tty;
+
+                # Keep an original copy
+                my $raw = POSIX::Termios->new();
+                $raw->getattr($fileno);
+
+                # backup
+                my $_cflag = $cflag = $raw->getcflag;
+                my $_iflag = $iflag = $raw->getiflag;
+                my $_oflag = $oflag = $raw->getoflag;
+                my $_lflag = $lflag = $raw->getlflag;
+
+                # https://man7.org/linux/man-pages/man3/termios.3.html
+                $_iflag = $_iflag & ~( IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON );
+                $raw->setiflag($_iflag);
+                $_oflag = $_oflag & ~OPOST;    # Disables post-processing output. Like turning \n into \r\n
+                $raw->setoflag($_oflag);
+                $_lflag = $_lflag & ~( ECHO | ECHONL | ICANON | ISIG | IEXTEN );
+                $raw->setlflag($_lflag);
+                $_cflag = $_cflag & ~( CSIZE | PARENB );
+                $_cflag |= CS8;
+                $raw->setcflag($_cflag);
+
+                # This is setup for blocking reads.  In the past we attempted to
+                # use non-blocking reads, but now a separate input loop and timer
+                # copes with the problems we had on some systems (BSD/Darwin)
+                # where close hung forever.
+                $raw->setcc( VMIN,  1 );
+                $raw->setcc( VTIME, 0 );
+                #
+                $sig_winch = $SIG{WINCH} if $SIG{WINCH};
+                $SIG{WINCH} = method {
+                    $sig_winch->() if defined $sig_winch;
+                    my ( $rows, $cols ) = $self->get_win_size();
+                    return $self->winch_event( Cancer::Event::Resize->new( w => $cols, h => $rows ) );
+                };
+                $SIG{WINCH}->($self);
+                $raw->setattr( $fileno, TCSANOW );
+            }
+        }
+        #
+        method cls ( $now //= !1 ) {    # immediate
+            $now ? syswrite $tty, $terminfo->Clear : 'TODO: clear front and back buffers';
+        }
+
+        method get_win_size {
+            my $w = "\0" x 8;
+            $tty // Carp::confess 'WHAT?';
+            ioctl( $tty, $self->TIOCGWINSZ(), $w );
+            my ( $rows, $cols ) = unpack 'S2', $w;    # rows, cols, pix_x, pix_y
+            $rows //= $ENV{LINES};
+            $cols //= $ENV{COLUMNS};
+            return ( $rows, $cols );
+
+            #Fallback: split ' ', qx[stty size </dev/tty 2>/dev/null];
+        }
+
+        method render() {
+            syswrite $tty, $front_buffer->data;
+            $front_buffer->data('');                  # Clear buffer
+        }
+
+        method write_at ( $x, $y, $string ) {
+            $front_buffer->data( $front_buffer->data . sprintf "\033[%d;%dH%s", $y, $x, $string );
+            $self->render;
+        }
+
+        method write ($string) {
+            $front_buffer->data( $front_buffer->data . $string );
+            $self->render;
+        }
+
+        method hide_cursor () {
+            syswrite $tty, "\e[?25l"    # immediate
+        }
+
+        method show_cursor () {
+            syswrite $tty, "\e[0H\e[0J\e[?25h"    # immediate
+        }
+
+        # Event system
+        method winch_event ($e) { $winch->($e) if defined $winch; }
+
+        # Platform utils
+        method TIOCGWINSZ () {    # See Perl::osnames
+            return 0x800c     if $^O =~ qr/\A(?:beos)\z/;
+            return 0x40087468 if $^O =~ qr/\A(?:MacOS|iphoneos|bitrig|dragonfly|(free|net|open)bsd|bsdos)\z/;
+            return 0x5468     if $^O =~ qr/\A(?:solaris|sunos)\z/;
+            return 0x5413         # Linux and android
+        }
+
+        method DESTROY ( $global = 0 ) {    # TODO: Reset everything else we've done so far like enable mouse
+            $tty // return;
+
+            #~ $s->title('') if $s->has_title();
+            #~ $s->mouse(0)  if $s->mouse;
+            #
+            my $fileno = fileno($tty);
             if ($Win32) {
-                require IO::Handle;
-                $tty_fh = IO::Handle->new_from_fd( $s->term, '+<' );
             }
             else {
-                Carp::croak sprintf 'Cannot open %s: %s', $s->term, $! unless sysopen $tty_fh, $s->term, O_RDWR | O_NDELAY | O_NOCTTY;
-                Carp::croak 'Not a terminal.' unless -t $tty_fh;
-            }
-            $tty_fh;
-        }
-    );
+                # Restore original copy
+                my $raw = POSIX::Termios->new();
+                $raw->getattr($fileno);
+                $raw->setcflag($cflag);
+                $raw->setiflag($iflag);
+                $raw->setoflag($oflag);
+                $raw->setlflag($lflag);
+                #
+                $raw->setattr( $fileno, TCSANOW );
 
+                #$s
+                $SIG{WINCH} = $sig_winch if defined $sig_winch;    # Restore original winch
+                close $;;
+            }
+        }
+    };
+    class Cancer::Buffer 0.01 {
+        field $width : param;          # int, required
+        field $height : param;         # width, required
+        field $data : param //= '';    # data
+
+        #
+        method width                   {$width}
+        method height                  {$height}
+        method data ( $append //= () ) { $data = $append if defined $append; $data }
+    };
+    class Cancer::Cell 0.01 {
+        use feature 'unicode_strings';
+        field $chr : param   //= ();    # char
+        field $dirty : param //= 1;     # bool; only redraw if true
+        field $style : param //= ();    # Unknown right now; I need to decide what styles look like
+
+        method chr ( $c //= () ) {
+            if ( defined $c ) {
+                Carp::croak "'$c' is too wide" if 1 < ( 0 + ( () = $c =~ /\w/g ) );
+                $chr   = $c;
+                $dirty = 1;
+            }
+            $chr;
+        }
+        method clean { $dirty = 0 }
+        #
+        method width  { 0 + ( defined $chr ? () = $chr =~ /\X/gu : 0 ) }    # Grapheme size
+        method length { 0 + ( defined $chr ? () = $chr =~ /\w/gu : 0 ) }    # Display size
+    };
+    class Cancer::Event 0.01 {
+
+        #define TB_KEY_F1               (0xFFFF - 0);
+        #define TB_KEY_F2               (0xFFFF - 1);
+        #define TB_KEY_F3               (0xFFFF - 2);
+        #define TB_KEY_F4               (0xFFFF - 3);
+        #define TB_KEY_F5               (0xFFFF - 4);
+        #define TB_KEY_F6               (0xFFFF - 5);
+        #define TB_KEY_F7               (0xFFFF - 6);
+        #define TB_KEY_F8               (0xFFFF - 7);
+        #define TB_KEY_F9               (0xFFFF - 8);
+        #define TB_KEY_F10              (0xFFFF - 9);
+        #define TB_KEY_F11              (0xFFFF - 10);
+        #define TB_KEY_F12              (0xFFFF - 11);
+        #define TB_KEY_INSERT           (0xFFFF - 12);
+        #define TB_KEY_DELETE           (0xFFFF - 13);
+        #define TB_KEY_HOME             (0xFFFF - 14);
+        #define TB_KEY_END              (0xFFFF - 15);
+        #define TB_KEY_PGUP             (0xFFFF - 16);
+        #define TB_KEY_PGDN             (0xFFFF - 17);
+        #define TB_KEY_ARROW_UP         (0xFFFF - 18);
+        #define TB_KEY_ARROW_DOWN       (0xFFFF - 19);
+        #define TB_KEY_ARROW_LEFT       (0xFFFF - 20);
+        #define TB_KEY_ARROW_RIGHT      (0xFFFF - 21);
+        sub TB_KEY_MOUSE_LEFT       { 0xFFFF - 22 }
+        sub TB_KEY_MOUSE_RIGHT      { 0xFFFF - 23 }
+        sub TB_KEY_MOUSE_MIDDLE     { 0xFFFF - 24 }
+        sub TB_KEY_MOUSE_RELEASE    { 0xFFFF - 25 }
+        sub TB_KEY_MOUSE_WHEEL_UP   { 0xFFFF - 26 }
+        sub TB_KEY_MOUSE_WHEEL_DOWN { 0xFFFF - 27 }
+        #
+        # Alt modifier constant, see tb_event.mod field and tb_select_input_mode
+        # function. Mouse-motion modifier
+        sub TB_MOD_ALT    { 0x01; }
+        sub TB_MOD_MOTION { 0x02; }
+        #
+        field $time : param //= method { Time::HiRes::time() }
+
+        #has [qw[type mod key ch x y]] => ( is => 'rw', isa => Int );
+    };
+
+    class Cancer::Event::Key : isa(Cancer::Event) {
+        field $glyph : param;        # string, required
+        field $mod : param //= 0;    # int
+    };
+
+    class Cancer::Event::Mouse : isa(Cancer::Event) {
+        field $button : param //= ();    # int
+        field $mod : param    //= ();    # int
+        field $x : param      //= ();    # int
+        field $y : param      //= ();    # int
+    };
+
+    class Cancer::Event::Resize : isa(Cancer::Event) {
+        field $w : param //= ();         # int
+        field $h : param //= ();         # int
+        method w () {$w}
+        method h () {$h}
+    };
+    1;
+}
+1;
+__END__
     # Store these and restore them on destruction
     CORE::state( $cflag, $iflag, $oflag, $lflag );
     has [qw[cflag iflag oflag lflag]] => ( is => 'rw', isa => Int, predicate => 1 );
@@ -60,48 +287,7 @@ package Cancer 0.01 {
         }
         else {
             # Keep an original copy
-            my $raw = POSIX::Termios->new();
-            $raw->getattr($fileno);
-
-            # backup
-            $s->cflag( $raw->getcflag ) if !$s->has_cflag;
-            $s->iflag( $raw->getiflag ) if !$s->has_iflag;
-            $s->oflag( $raw->getoflag ) if !$s->has_oflag;
-            $s->lflag( $raw->getlflag ) if !$s->has_lflag;
-
-            # CORE::state
-            $cflag //= $raw->getcflag;
-            $iflag //= $raw->getiflag;
-            $oflag //= $raw->getoflag;
-            $lflag //= $raw->getlflag;
-
-            # https://man7.org/linux/man-pages/man3/termios.3.html
-            $iflag = $iflag & ~( IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON );
-            $raw->setiflag($iflag);
-            $oflag = $oflag & ~OPOST;    # Disables post-processing output. Like turning \n into \r\n
-            $raw->setoflag($oflag);
-            $lflag = $lflag & ~( ECHO | ECHONL | ICANON | ISIG | IEXTEN );
-            $raw->setlflag($lflag);
-            $cflag = $cflag & ~( CSIZE | PARENB );
-            $cflag |= CS8;
-            $raw->setcflag($cflag);
-
-            # This is setup for blocking reads.  In the past we attempted to
-            # use non-blocking reads, but now a separate input loop and timer
-            # copes with the problems we had on some systems (BSD/Darwin)
-            # where close hung forever.
-            $raw->setcc( VMIN,  1 );
-            $raw->setcc( VTIME, 0 );
-            #
-            $s->sig_winch( $SIG{WINCH} ) if $SIG{WINCH};
-            $SIG{WINCH} = sub {
-                $s->sig_winch->() if $s->has_sig_winch;
-                my ( $rows, $cols ) = $s->get_win_size();
-                $s->winch_event( Cancer::Event::Resize->new( w => $cols, h => $rows ) );
-                $s;
-            };
-            $SIG{WINCH}->();
-            $raw->setattr( $fileno, TCSANOW );
+            #moved
         }
         #
         # Todo: If the user's platform exists, load it
@@ -109,78 +295,18 @@ package Cancer 0.01 {
         Role::Tiny->apply_roles_to_object( $s, 'Cancer::IO::Select' );
     }
 
-    sub DEMOLISH ( $s, $global = 0 ) {    # TODO: Reset everything else we've done so far like enable mouse
-        return        if !$s->has_tty;
-        $s->title('') if $s->has_title();
-        $s->mouse(0)  if $s->mouse;
-        #
-        my $fileno = fileno( $s->tty );
-        if ($Win32) {
-        }
-        else {
-            # Restore original copy
-            my $raw = POSIX::Termios->new();
-            $raw->getattr($fileno);
-            $raw->setcflag( $s->cflag ) if $s->has_cflag;
-            $raw->setiflag( $s->iflag ) if $s->has_iflag;
-            $raw->setoflag( $s->oflag ) if $s->has_oflag;
-            $raw->setlflag( $s->lflag ) if $s->has_lflag;
-            #
-            $raw->setattr( $fileno, TCSANOW );
-
-            #$s
-            $SIG{WINCH} = $s->sig_winch if $s->has_sig_winch;    # Restore original winch
-            close $s->tty;
-        }
-    }
-    has [qw[back_buffer front_buffer]] => (
-        is  => 'ro',
-        isa => InstanceOf ['Cancer::Buffer'],
-        #
-        #        #required => 1,
-        lazy    => 1,
-        builder => sub ($s) {
-            Cancer::Buffer->new( width => $s->width, height => $s->height );
-        }
-    );
-    has cells => (
-        is      => 'rwp',
-        isa     => ArrayRef [ ArrayRef [ InstanceOf ['Cancer::Cell'] ] ],
-        lazy    => 1,
-        builder => sub ($s) {
-            [   map {
-                    [ map { Cancer::Cell->new() } 1 .. $s->width ]
-                } 1 .. $s->height
-            ]
-        }
-    );
-
     # Resize
     has winch_event        => ( is => 'rw',  isa => InstanceOf ['Cancer::Event'], lazy => 1, predicate => 1, clearer => 1 );
     has sig_winch          => ( is => 'rwp', isa => CodeRef, lazy => 1, predicate => 1 );
     has [qw[width height]] => ( is => 'ro',  isa => Int,     lazy => 1, builder   => 1, clearer => 1 );
 
-    sub _build_width ($s) {
-        my ( undef, $width ) = $s->get_win_size;
-        $width;
-    }
 
-    sub _build_height ($s) {
-        my ( $height, undef ) = $s->get_win_size;
-        $height;
-    }
 
     sub raw_write ( $s, $data ) {
         $s->front_buffer->data( $s->front_buffer->data . $data );
     }
 
-    sub hide_cursor ($s) {
-        syswrite $s->tty, "\e[?25l"    # immediate
-    }
 
-    sub show_cursor ($s) {
-        syswrite $s->tty, "\e[0H\e[0J\e[?25h"    # immediate
-    }
     has mouse => (
         is      => 'rw',
         isa     => Bool,
@@ -333,40 +459,9 @@ package Cancer 0.01 {
         # Force the terminal to a new size
     }
 
-    sub write_at ( $s, $x, $y, $string ) {
-        $s->front_buffer->data( $s->front_buffer->data . sprintf "\033[%d;%dH%s", $y, $x, $string );
-        $s->render;
-    }
 
-    sub write ( $s, $string ) {
-        $s->front_buffer->data( $s->front_buffer->data . $string );
-        $s->render;
-    }
 
-    sub cls ($s) {
-        if ($Win32) {
-            $s->tty->syswrite( $s->Clear );
-        }
-        else {
-            syswrite $s->tty, $s->Clear;
-        }
 
-        #$s->
-        #$s->front_buffer->data( $s->front_buffer->data . $s->Clear );
-        #$s->render;    # No waiting
-    }
-
-    sub render ($s) {
-        my ( $x, $y, $w, $i );
-        my $data = '';
-        my ( $back, $front );    # = Cell->new();
-        for my $y ( 0 .. $s->front_buffer->height ) {
-            for my $x ( 0 .. $s->front_buffer->width ) {
-            }
-        }
-        syswrite $s->tty, $s->front_buffer->data;
-        $s->front_buffer->data('');    # Clear buffer
-    }
 
     sub draw_cell ( $s, $x, $y ) {
 
@@ -394,13 +489,7 @@ package Cancer 0.01 {
     }    # Clears the internal buffer using TB_DEFAULT or the default_bg and default_fg
     has [qw[default_bg default_fg]] => ( is => 'rw', isa => Int, default => Cancer::Colors::TB_DEFAULT() );
 
-    # Platform utils
-    sub TIOCGWINSZ ($s) {    # See Perl::osnames
-        return 0x800c     if $^O =~ qr/\A(?:beos)\z/;
-        return 0x40087468 if $^O =~ qr/\A(?:MacOS|iphoneos|bitrig|dragonfly|(free|net|open)bsd|bsdos)\z/;
-        return 0x5468     if $^O =~ qr/\A(?:solaris|sunos)\z/;
-        return 0x5413        # Linux and android
-    }
+
 
 =pod
 

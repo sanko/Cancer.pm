@@ -1,7 +1,7 @@
-#!perl
 use Test2::V0;
-use Test2::Tools::Exception qw[dies];
 use lib 'lib', '../lib';
-END { done_testing(); }
+use Cancer;
 $|++;
-ok 'use Cancer';
+diag 'Cancer v' . $Cancer::VERSION;
+ok 'works';
+done_testing();

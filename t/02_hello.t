@@ -9,8 +9,9 @@ $|++;
 use Cancer;
 my $term = eval { Cancer->new };
 plan skip_all => 'Need interactive stdin, stderr' unless $term;
-diag $term->term;
-$term->cls;
+
+#~ diag $term->term;
+$term->cls(1);
 diag 'clear';
 $term->write_at( 5, 4, 'Hello, world!' );
 

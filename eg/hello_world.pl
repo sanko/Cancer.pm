@@ -4,9 +4,11 @@ use Data::Dump;
 use lib '../lib';
 #
 use Cancer;
+use Cancer::terminfo::xterm::256color;
 #
 my $term = Cancer->new;
-$term->cls;
+ddx $term->get_win_size;
+$term->cls(1);
 
 #$term->write_at( 5, 4, 'Hello, world!' );
 sub out {
