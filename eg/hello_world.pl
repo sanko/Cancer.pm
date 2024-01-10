@@ -47,3 +47,12 @@ sub out {
     $s->render;
 }
 out( $term, 'Hello, world!' );
+my $live = 10;
+while ($live) {
+    sleep 1;
+    use Data::Dump;
+    my $data = $term->read(100);
+    next if !$data;
+    ddx $data;
+    $live--;
+}
