@@ -103,6 +103,15 @@ package Cancer 0.01 {
                 #>>V
                 $SIG{WINCH}->($self);
                 $raw->setattr( $fileno, TCSANOW );
+
+                # enter mouse
+                syswrite $tty, "\x1b[?1000h\x1b[?1002h\x1b[?1015h\x1b[?1006h";
+
+#define TB_HARDCAP_ENTER_MOUSE  "\x1b[?1000h\x1b[?1002h\x1b[?1015h\x1b[?1006h"
+#define TB_HARDCAP_EXIT_MOUSE   "\x1b[?1006l\x1b[?1015l\x1b[?1002l\x1b[?1000l"
+#define TB_HARDCAP_STRIKEOUT    "\x1b[9m"
+#define TB_HARDCAP_UNDERLINE_2  "\x1b[21m"
+#define TB_HARDCAP_OVERLINE     "\x1b[53m"
             }
         }
         #
@@ -136,6 +145,10 @@ package Cancer 0.01 {
             $front_buffer->data( $front_buffer->data . $string );
             $self->render;
         }
+        method read ($len//=1){
+        sysread $tty, my( $ret), $len;
+$ret;
+        }
 
         method hide_cursor () {
             syswrite $tty, "\e[?25l"    # immediate
@@ -163,6 +176,7 @@ package Cancer 0.01 {
             #~ $s->mouse(0)  if $s->mouse;
             #
             my $fileno = fileno($tty);
+            $fileno // return;
             if ($Win32) {
             }
             else {
@@ -179,7 +193,10 @@ package Cancer 0.01 {
                 #$s
                 $SIG{WINCH} = $sig_winch if defined $sig_winch;    # Restore original winch
                 close $;;
-            }
+
+            # exit mouse
+            syswrite $tty,    "\x1b[?1006l\x1b[?1015l\x1b[?1002l\x1b[?1000l"
+        }
         }
     };
     class Cancer::Buffer 0.01 {
