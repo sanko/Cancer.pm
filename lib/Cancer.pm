@@ -93,15 +93,14 @@ package Cancer 0.01 {
                 $raw->setcc( VMIN,  1 );
                 $raw->setcc( VTIME, 0 );
                 #
-                $sig_winch = $SIG{WINCH} if $SIG{WINCH};
-                #<<V
-                $SIG{WINCH} = method {
-                    $sig_winch->() if defined $sig_winch;
+                $sig_winch = $SIG{WINCH} if defined $SIG{WINCH};
+                $SIG{WINCH} = sub {
+                    $sig_winch->($self) if defined $sig_winch;    # call default
+                    return              if !$winch;               # no defined resize handler
                     my ( $rows, $cols ) = $self->get_win_size();
-                    return $self->winch_event( Cancer::Event::Resize->new( w => $cols, h => $rows ) );
+                    $winch->( $self, Cancer::Event::Resize->new( w => $cols, h => $rows ) );
                 };
-                #>>V
-                $SIG{WINCH}->($self);
+                $SIG{WINCH}->($self) if defined $SIG{WINCH};
                 $raw->setattr( $fileno, TCSANOW );
 
                 # enter mouse
@@ -192,21 +191,21 @@ $ret;
 
                 #$s
                 $SIG{WINCH} = $sig_winch if defined $sig_winch;    # Restore original winch
-                close $;;
+                close $tty;
 
             # exit mouse
             syswrite $tty,    "\x1b[?1006l\x1b[?1015l\x1b[?1002l\x1b[?1000l"
-        }
+            }
         }
     };
     class Cancer::Buffer 0.01 {
-        field $width : param;          # int, required
-        field $height : param;         # width, required
+        field $w : param;              # int, required
+        field $h : param;              # width, required
         field $data : param //= '';    # data
 
         #
-        method width                   {$width}
-        method height                  {$height}
+        method w                       {$w}
+        method h                       {$h}
         method data ( $append //= () ) { $data = $append if defined $append; $data }
     };
     class Cancer::Cell 0.01 {
