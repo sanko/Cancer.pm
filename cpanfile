@@ -4,7 +4,6 @@ requires 'POSIX';
 requires 'IO::Select';
 requires 'Carp';
 requires 'Time::HiRes';
-
 on 'test' => sub {
     requires 'Test2::V0';
     requires 'Test2::Tools::Exception';

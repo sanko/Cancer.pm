@@ -19,11 +19,138 @@ package Cancer 0.01 {
     use Cancer::terminfo;
     use Cancer::terminfo::xterm::256color;
     #
+
+
+
+sub normalizehandle
+{
+    my ($file) = @_; # allows fake signature optimization
+
+    no strict;
+    #	print "Handle = $file\n";
+    if ( ref($file) ) { return $file; }    # Reference is fine
+
+    #	if ($file =~ /^\*/) { return $file; } # Type glob is good
+    if ( ref( \$file ) eq 'GLOB' ) { return $file; }    # Glob is good
+
+    #	print "Caller = ",(caller(1))[0],"\n";
+    return \*{ ( ( caller(1) )[0] ) . "::$file" };
+}
+my $UseEnv = 0;
+sub GetTerminalSize
+{
+    my $file = normalizehandle( ( @_ > 0 ? $_[0] : \*STDOUT ) );
+
+    my (@results, @fail);
+
+    if ( &termsizeoptions() & 1 )                       # VIO
+    {
+        @results = GetTermSizeVIO($file);
+        push( @fail, "VIOGetMode call" );
+    }
+    elsif ( &termsizeoptions() & 2 )                    # GWINSZ
+    {
+        @results = GetTermSizeGWINSZ($file);
+        push( @fail, "TIOCGWINSZ ioctl" );
+    }
+    elsif ( &termsizeoptions() & 4 )                    # GSIZE
+    {
+        @results = GetTermSizeGSIZE($file);
+        push( @fail, "TIOCGSIZE ioctl" );
+    }
+    elsif ( &termsizeoptions() & 8 )                    # WIN32
+    {
+        @results = GetTermSizeWin32($file);
+        push( @fail, "Win32 GetConsoleScreenBufferInfo call" );
+    }
+    else
+    {
+        @results = ();
+    }
+
+    if ( @results < 4 and $UseEnv )
+    {
+        my ($C) = defined( $ENV{COLUMNS} ) ? $ENV{COLUMNS} : 0;
+        my ($L) = defined( $ENV{LINES} )   ? $ENV{LINES}   : 0;
+        if ( ( $C >= 2 ) and ( $L >= 2 ) )
+        {
+            @results = ( $C + 0, $L + 0, 0, 0 );
+        }
+        push( @fail, "COLUMNS and LINES environment variables" );
+    }
+
+    if ( @results < 4 && $^O ne 'MSWin32')
+    {
+        my ($prog) = "resize";
+
+        # Workaround for Solaris path silliness
+        if ( -f "/usr/openwin/bin/resize" ) {
+            $prog = "/usr/openwin/bin/resize";
+        }
+
+        my ($resize) = scalar(`$prog 2>/dev/null`);
+        if (defined $resize
+            and (  $resize =~ /COLUMNS\s*=\s*(\d+)/
+                or $resize =~ /setenv\s+COLUMNS\s+'?(\d+)/ )
+           )
+        {
+            $results[0] = $1;
+            if (   $resize =~ /LINES\s*=\s*(\d+)/
+                or $resize =~ /setenv\s+LINES\s+'?(\d+)/ )
+            {
+                $results[1] = $1;
+                @results[ 2, 3 ] = ( 0, 0 );
+            }
+            else
+            {
+                @results = ();
+            }
+        }
+        else
+        {
+            @results = ();
+        }
+        push( @fail, "resize program" );
+    }
+
+    if ( @results < 4 && $^O ne 'MSWin32' )
+    {
+        my ($prog) = "stty size";
+
+        my ($stty) = scalar(`$prog 2>/dev/null`);
+        if (defined $stty
+            and (  $stty =~ /(\d+) (\d+)/ )
+           )
+        {
+            $results[0] = $2;
+            $results[1] = $1;
+            @results[ 2, 3 ] = ( 0, 0 );
+        }
+        else
+        {
+            @results = ();
+        }
+        push( @fail, "stty program" );
+    }
+
+    if ( @results != 4 )
+    {
+        carp("Unable to get Terminal Size."
+             . join( "", map( " The $_ didn't work.", @fail ) ));
+	return undef;
+    }
+
+    @results;
+}
+
+
+
     my $singleton;
     #
     class Cancer {
-        field $term : param     //= $Win32 ? fileno(STDOUT) : '/dev/tty';
-        field $tty : param      //= ();
+        field $term : param //= $Win32 ? 'CONIN$' : '/dev/tty';
+        field $tty : param  //= ();
+        field $tty_out;
         field $type : param     //= 'Cancer::terminfo::xterm::256color';
         field $terminfo : param //= '';
         #
@@ -48,23 +175,44 @@ package Cancer 0.01 {
             $singleton //= $self;
             if ( !defined $tty ) {
                 if ($Win32) {
+                    warn;
                     require IO::Handle;
-                    $tty = IO::Handle->new_from_fd( $term, '+<' );
+                    warn;
+
+                    #~ $tty = IO::Handle->new_from_fd( $term, '+<' );
+                    #~ $tty_out = IO::Handle->new_from_fd( 'CONOUT$', '+<' );
+                                        warn;
+
+                    sysopen( $tty,     'CONIN$',  O_RDWR ) or die "Unable to open console input:$!";
+                                        warn;
+
+                    sysopen( $tty_out, 'CONOUT$', O_RDWR ) or die "Unable to open console output:$!";
+                                        warn;
+
+                    #                    require "sys/ioctl.ph";
+                    warn;
+
+                   my ($rows, $cols, $xpix, $ypix) = GetTerminalSize();
+                    warn sprintf "(rows=%u, cols=%u, xpix=%u, ypix=%u)\n", $rows // 0, $cols // 0, $xpix, $ypix;
                 }
                 else {
                     croak sprintf 'Cannot open %s: %s', $term, $! unless sysopen $tty, $term, O_RDWR | O_NDELAY | O_NOCTTY;
                     croak 'Not a terminal.' unless -t $tty;
+                    $tty_out = $tty;
                 }
             }
             $terminfo = $type->new;
             if ( !defined $height || !defined $width ) {
                 my ( $w, $h ) = $self->get_win_size();
+                warn $w;
+                warn $h;
                 $width  //= $w;
                 $height //= $h;
             }
-            $front_buffer //= Cancer::Buffer->new( width => $width, height => $height );
-            $back_buffer  //= Cancer::Buffer->new( width => $width, height => $height );
-            if ($Win32) { }
+            $front_buffer //= Cancer::Buffer->new( w => $width, h => $height );
+            $back_buffer  //= Cancer::Buffer->new( w => $width, h => $height );
+            if ($Win32) {
+            }
             else {
                 my $fileno = fileno $tty;
 
@@ -107,18 +255,18 @@ package Cancer 0.01 {
                 $raw->setattr( $fileno, TCSANOW );
 
                 # enter mouse
-                syswrite $tty, "\x1b[?1000h\x1b[?1002h\x1b[?1015h\x1b[?1006h";
+                syswrite $tty_out, "\x1b[?1000h\x1b[?1002h\x1b[?1015h\x1b[?1006h";
 
-#define TB_HARDCAP_ENTER_MOUSE  "\x1b[?1000h\x1b[?1002h\x1b[?1015h\x1b[?1006h"
-#define TB_HARDCAP_EXIT_MOUSE   "\x1b[?1006l\x1b[?1015l\x1b[?1002l\x1b[?1000l"
-#define TB_HARDCAP_STRIKEOUT    "\x1b[9m"
-#define TB_HARDCAP_UNDERLINE_2  "\x1b[21m"
-#define TB_HARDCAP_OVERLINE     "\x1b[53m"
+                #define TB_HARDCAP_ENTER_MOUSE  "\x1b[?1000h\x1b[?1002h\x1b[?1015h\x1b[?1006h"
+                #define TB_HARDCAP_EXIT_MOUSE   "\x1b[?1006l\x1b[?1015l\x1b[?1002l\x1b[?1000l"
+                #define TB_HARDCAP_STRIKEOUT    "\x1b[9m"
+                #define TB_HARDCAP_UNDERLINE_2  "\x1b[21m"
+                #define TB_HARDCAP_OVERLINE     "\x1b[53m"
             }
         }
         #
         method cls ( $now //= !1 ) {    # immediate
-            $now ? syswrite $tty, $terminfo->Clear : 'TODO: clear front and back buffers';
+            $now ? syswrite $tty_out, $terminfo->Clear : 'TODO: clear front and back buffers';
         }
 
         method get_win_size {
@@ -134,7 +282,7 @@ package Cancer 0.01 {
         }
 
         method render() {
-            syswrite $tty, $front_buffer->data;
+            syswrite $tty_out, $front_buffer->data;
             $front_buffer->data('');                  # Clear buffer
         }
 
@@ -147,17 +295,18 @@ package Cancer 0.01 {
             $front_buffer->data( $front_buffer->data . $string );
             $self->render;
         }
-        method read ($len//=1){
-        sysread $tty, my( $ret), $len;
-$ret;
+
+        method read ( $len //= 1 ) {
+            sysread $tty_out, my ($ret), $len;
+            $ret;
         }
 
         method hide_cursor () {
-            syswrite $tty, "\e[?25l"    # immediate
+            syswrite $tty_out, "\e[?25l"    # immediate
         }
 
         method show_cursor () {
-            syswrite $tty, "\e[0H\e[0J\e[?25h"    # immediate
+            syswrite $tty_out, "\e[0H\e[0J\e[?25h"    # immediate
         }
 
         # Event system
@@ -184,21 +333,22 @@ $ret;
             else {
                 # Restore original copy
                 my $raw = POSIX::Termios->new();
-                $raw->getattr($fileno);
-                $raw->setcflag($cflag);
-                $raw->setiflag($iflag);
-                $raw->setoflag($oflag);
-                $raw->setlflag($lflag);
+                $raw->getattr($fileno) if defined $fileno;
+                $raw->setcflag($cflag) if defined $cflag;
+                $raw->setiflag($iflag) if defined $iflag;
+                $raw->setoflag($oflag) if defined $oflag;
+                $raw->setlflag($lflag) if defined $lflag;
                 #
                 $raw->setattr( $fileno, TCSANOW );
 
                 #$s
                 $SIG{WINCH} = $sig_winch if defined $sig_winch;    # Restore original winch
-                close $tty;
 
-            # exit mouse
-            syswrite $tty,    "\x1b[?1006l\x1b[?1015l\x1b[?1002l\x1b[?1000l"
+                # exit mouse
+                syswrite $tty_out, "\x1b[?1006l\x1b[?1015l\x1b[?1002l\x1b[?1000l";
             }
+            close $tty_out unless $tty eq $tty_out;
+            close $tty;
         }
     };
     class Cancer::Buffer 0.01 {
