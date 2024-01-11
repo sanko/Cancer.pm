@@ -5,10 +5,6 @@ requires 'IO::Select';
 requires 'Carp';
 requires 'Time::HiRes';
 
-# TODO: remove these!!!!
-requires 'Moo';
-requires 'Types::Standard';
-requires 'Role::Tiny';
 on 'test' => sub {
     requires 'Test2::V0';
     requires 'Test2::Tools::Exception';

@@ -19,6 +19,8 @@ package Cancer 0.01 {
     use Cancer::terminfo;
     use Cancer::terminfo::xterm::256color;
     #
+    my $singleton;
+    #
     class Cancer {
         field $term : param     //= $Win32 ? fileno(STDOUT) : '/dev/tty';
         field $tty : param      //= ();
@@ -43,6 +45,7 @@ package Cancer 0.01 {
         field $sig_winch;
         #
         ADJUST {
+            $singleton //= $self;
             if ( !defined $tty ) {
                 if ($Win32) {
                     require IO::Handle;

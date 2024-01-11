@@ -70,10 +70,8 @@
             "Carp" : "0",
             "Fcntl" : "0",
             "IO::Select" : "0",
-            "Moo" : "0",
             "POSIX" : "0",
-            "Role::Tiny" : "0",
-            "Types::Standard" : "0",
+            "Time::HiRes" : "0",
             "perl" : "v5.38.0"
          }
       },
