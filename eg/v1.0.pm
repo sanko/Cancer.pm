@@ -1,15 +1,20 @@
 #~ Windows: https://conemu.github.io/en/wsl.html
+#~ https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Controls-beginning-with-ESC
 use v5.38;
 use experimental 'class';
 use IO::Select;
 use Carp qw[];
 my $Win32 = $^O eq 'MSWin32' ? 1 : !1;
+my $TERM  = $ENV{TERM} // '';
+my $urxvt = $TERM =~ m[rxvt-unicode];
 
 class Cancer {
     use Fcntl qw[O_RDWR O_NDELAY O_NOCTTY];
     #
-    field $mouse : param //= 1;    # bool
-    field $winch : param //= ();
+    field $mouse : param      //= 1;    # modes (0..3)
+    field $winch : param      //= ();
+    field $alt_buffer : param //= 1;
+    field $cursor : param     //= 0;
     #
     field $tty_i;
     field $tty_o;
@@ -21,7 +26,6 @@ class Cancer {
     field $iflag;
     field $oflag;
     field $lflag;
-    field $sig_winch;
     field $mode;
     field $attr;
     field $cc;
@@ -86,21 +90,35 @@ class Cancer {
             #~ warn $raw->getoflag;
             #~ warn $raw->getospeed;
         }
-        {
-            #
-            $sig_winch = $SIG{WINCH} if defined $SIG{WINCH};
-            $SIG{WINCH} = sub {
-                $sig_winch->($self) if defined $sig_winch;    # call default
-
-                #~ return              if !$winch;               # no defined resize handler
-                #~ my ( $rows, $cols ) = $self->get_win_size();
-                #~ $winch->( $self, Cancer::Event::Resize->new( w => $cols, h => $rows ) ) if $winch;
-            };
-            $SIG{WINCH}->($self) if defined $SIG{WINCH};
+        if ( defined $winch ) {
+            my $hold = $SIG{WINCH};
+            $SIG{WINCH} = defined $hold ? sub { $winch->($self); $hold->(); } : sub { $winch->($self) };
         }
         $select_i->add($tty_i);
         $select_o->add($tty_o);
-        $self->write( MOUSEON() ) if $mouse;
+        $self->set_mouse($mouse);
+        $self->set_cursor($cursor);
+        $self->write( $alt_buffer ? ALT_BUFF_ON() : ALT_BUFF_OFF() );
+    }
+
+    method DESTROY ( $global //= 0 ) {
+        my $fileno = fileno $tty_i;
+
+        # Restore original flags
+        my $raw = POSIX::Termios->new();
+        $raw->setcflag($cflag);
+        $raw->setlflag($lflag);
+        $raw->setoflag($oflag);
+        $raw->setiflag($iflag);
+        $raw->setcc( $_, $cc->[0] ) for 0 .. scalar @$cc;
+        $raw->setattr( $fileno, $attr );
+        #
+        $self->set_mouse(0);
+        $self->set_cursor(1);
+        $self->blank_screen;
+
+        #~ $SIG{WINCH} = $sig_winch       if defined $sig_winch;    # Restore original winch
+        $self->write( ALT_BUFF_OFF() ) if $alt_buffer;
     }
 
     method write ( $data //= () ) {
@@ -163,50 +181,30 @@ class Cancer {
     sub RCP() { CSI . 'u' }       # Restore cursor position
 
     #
-    sub CURSORON () { CSI . '?25h' }    # Show the cursor
-    sub CURSOROFF() { CSI . '?25l' }    # Hide the cursor
+    #
+    sub FOCUS_ON()     { CSI . '?1004h' }    # Enable focus reporting (CSI . 'I' is in, CSI . 'O' is out)
+    sub FOCUS_OFF()    { CSI . '?1004l' }    # Disable focus reporting
+    sub ALT_BUFF_ON()  { CSI . '?1049h' }    # Enable alt screen buffer [xterm]
+    sub ALT_BUFF_OFF() { CSI . '?1049l' }    # Disalbe alt screen buffer [xterm]
 
     #
-    sub FOCUSON()    { CSI . '?1004h' }    # Enable focus reporting (CSI . 'I' is in, CSI . 'O' is out)
-    sub FOCUSOFF()   { CSI . '?1004l' }    # Disable focus reporting
-    sub ALTBUFFON()  { CSI . '?1049h' }    # Enable alt screen buffer [xterm]
-    sub ALTBUFFOFF() { CSI . '?1049l' }    # Disalbe alt screen buffer [xterm]
-
-    #define SET_X10_MOUSE               9
-    #define SET_VT200_MOUSE             1000
-    #define SET_VT200_HIGHLIGHT_MOUSE   1001
-    #define SET_BTN_EVENT_MOUSE         1002
-    #define SET_ANY_EVENT_MOUSE         1003
-    #define SET_FOCUS_EVENT_MOUSE       1004
-    #define SET_ALTERNATE_SCROLL        1007
-    #define SET_EXT_MODE_MOUSE          1005
-    #define SET_SGR_EXT_MODE_MOUSE      1006
-    #define SET_URXVT_EXT_MODE_MOUSE    1015
-    #define SET_PIXEL_POSITION_MOUSE    1016
-    sub MOUSEBTNON()     { CSI . '?1002h' }
-    sub MOUSEBTNOFF()    { CSI . '?1002l' }
-    sub MOUSEANYON()     { CSI . '?1003h' }
-    sub MOUSEANYOFF()    { CSI . '?1003l' }
-    sub MOUSEFOCUSON()   { CSI . '?1004h' }
-    sub MOUSEFOCUSOFF()  { CSI . '?1004l' }
-    sub MOUSESCROLLON()  { CSI . '?1007h' }
-    sub MOUSESCROLLOFF() { CSI . '?1007l' }
-    sub MOUSEEXTON()     { CSI . '?1005h' }
-    sub MOUSEEXTOFF()    { CSI . '?1005l' }
-    sub MOUSEPIXELON()   { CSI . '?1016h' }
-    sub MOUSEPIXELOFF()  { CSI . '?1016l' }
-
-    sub MOUSEON() {
-        MOUSEBTNON . MOUSEANYON . MOUSEFOCUSON . MOUSESCROLLON . MOUSEEXTON . MOUSEPIXELON;
-    }
-
-    sub MOUSEOFF() {
-        MOUSEBTNOFF . MOUSEANYOFF . MOUSEFOCUSOFF . MOUSESCROLLOFF . MOUSEEXTOFF . MOUSEPIXELOFF;
-    }
+    sub CURSOR () {25}
+    #
+    sub MOUSE_X10()              {9}
+    sub MOUSE_VT200()            {1000}
+    sub MOUSE_VT200_HIGHLIGHT()  {1001}
+    sub MOUSE_BTN_EVENT()        {1002}
+    sub MOUSE_ANY_EVENT()        {1003}
+    sub MOUSE_FOCUS_EVENT()      {1004}
+    sub MOUSE_ALTERNATE_SCROLL() {1007}
+    sub MOUSE_EXT_MODE()         {1005}
+    sub MOUSE_SGR_EXT_MODE()     {1006}
+    sub MOUSE_URXVT_EXT_MODE()   {1015}
+    sub MOUSE_PIXEL_POSITION()   {1016}
 
     # https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Functions-using-CSI-_-ordered-by-the-final-character_s_
-    sub BRACKETPASTEON()  { CSI . '?2004h' }    # Enable bracketed paste mode
-    sub BRACKETPASTEOFF() { CSI . '?2004l' }    # Disable bracketed paste mode
+    sub BRACKET_PASTE_ON()  { CSI . '?2004h' }    # Enable bracketed paste mode
+    sub BRACKET_PASTE_OFF() { CSI . '?2004l' }    # Disable bracketed paste mode
 
     # Select Graphic Rendition (SGR) params
     sub reset ()            { SGR 0 }
@@ -257,7 +255,7 @@ class Cancer {
     method blank_line ()  { $self->write( CSI . '2K' ) }
     #
     method cursor_position ( $x, $y ) {
-        ESC . "[" . ( $y + 1 ) . ';' . ( $x + 1 ) . 'H';
+        $self->write( ESC . "[" . ( $y + 1 ) . ';' . ( $x + 1 ) . 'H' );
     }
 
     # Color systems
@@ -279,11 +277,65 @@ class Cancer {
     #~ method set_traits ($_traits) { $traits = $_traits; $self->write("\033[22;23;24;25;27;28;29${traits}m") }
     #
     method write_at ( $x, $y, $string ) {
-        $self->write( sprintf ESC . '[%d;%dH%s', $y, $x, $string );
+        $self->write( sprintf CSI . '%d;%dH%s', $y, $x, $string );
     }
-    my $letters = '';
 
+    # Platform utils
+    sub TIOCGWINSZ () {    # See Perl::osnames
+        return 0x800c     if $^O =~ qr/\A(?:beos)\z/;
+        return 0x40087468 if $^O =~ qr/\A(?:MacOS|iphoneos|bitrig|dragonfly|(free|net|open)bsd|bsdos)\z/;
+        return 0x5468     if $^O =~ qr/\A(?:solaris|sunos)\z/;
+        return 0x5413      # Linux and android
+    }
+
+    method terminal_size () {
+        my $winsize = "\0" x 8;
+        ( ( ioctl( $tty_o, TIOCGWINSZ(), $winsize ) ) ? ( unpack 'S4', $winsize ) : ( map { $_ * 0 } ( 1 .. 4 ) ) );
+    }
+
+    method terminal_width() {
+        my ( $rows, $cols, $xpix, $ypix ) = $self->terminal_size;
+        return $cols;
+    }
+
+    method terminal_height() {
+        my ( $rows, $cols, $xpix, $ypix ) = $self->terminal_size;
+        return $rows;
+    }
+
+    # 0: off
+    # 1: basic
+    # 2: drag
+    # 3: move
+    method set_mouse ($mode) {
+        $mouse = $mode;
+        CORE::state $switch //= {
+            0 => sub {
+                CSI . '?' . ( join ';', MOUSE_VT200, MOUSE_BTN_EVENT, MOUSE_ANY_EVENT, $urxvt ? MOUSE_URXVT_EXT_MODE : MOUSE_URXVT_EXT_MODE ) . 'l';
+            },
+            1 => sub {
+                CSI . '?' .     ( join ';', MOUSE_BTN_EVENT, MOUSE_ANY_EVENT ) . 'l' .                                       # off
+                    CSI . '?' . ( join ';', MOUSE_VT200,     $urxvt ? MOUSE_URXVT_EXT_MODE : MOUSE_URXVT_EXT_MODE ) . 'h';
+            },
+            2 => sub {
+                CSI . '?' .     ( join ';', MOUSE_VT200,     MOUSE_ANY_EVENT ) . 'l' .                                       # off
+                    CSI . '?' . ( join ';', MOUSE_BTN_EVENT, $urxvt ? MOUSE_URXVT_EXT_MODE : MOUSE_URXVT_EXT_MODE ) . 'h';
+            },
+            3 => sub {
+                CSI . '?' .     ( join ';', MOUSE_VT200,     MOUSE_BTN_EVENT ) . 'l' .                                       # off
+                    CSI . '?' . ( join ';', MOUSE_ANY_EVENT, $urxvt ? MOUSE_URXVT_EXT_MODE : MOUSE_URXVT_EXT_MODE ) . 'h';
+            }
+        };
+        $self->write( $switch->{$mode}->() );
+    }
+
+    method set_cursor ($mode) {
+        $cursor = $mode;
+        $self->write( CSI . '?' . CURSOR() . ( $mode ? 'h' : 'l' ) );
+    }
+    #
     method parse_event ($data) {
+        CORE::state $letters //= '';
         return if !length $data;
         my $first = substr $data, 1;
         if ( $data =~ /^\e/ ) {
@@ -303,55 +355,174 @@ class Cancer {
         sleep 0.01;
         my $in = $self->read;
         use Data::Dump;
-        $self->write_at( 0, 0, Data::Dump::pp($in) );
+        $self->write_at( 0, 0, localtime() . ': ' . Data::Dump::pp($in) );
         $self->parse_event($in);
+        $in // return 1;
         return $in ne 'q';
     }
     method loop() { 1 while $self->one_loop; }
+}
 
-    method DESTROY ( $global //= 0 ) {
-        my $fileno = fileno $tty_i;
+class Cancer::Widget {
+    field $x : param;
+    field $y : param;
+    field $w : param;
+    field $h : param;
+    field $cancer : param;
+    field $box = [
+        qw[
+            ┌ ─ ┐
+            │   │
+            └ ─ ┘
+        ]
+    ];
 
-        # Exit mouse
-        $self->write(MOUSEOFF) if $mouse;
-        $self->blank_screen;
-        $SIG{WINCH} = $sig_winch if defined $sig_winch;    # Restore original winch
+    method draw() {
+        $cancer->cursor_position( $x, $y );
+        $cancer->write( $box->[0] . ( $box->[1] x ( $w - 2 ) ) . $box->[2] );
+        $cancer->cursor_position( $x, $y + 1 );
+        for my $row ( 1 .. $h - 1 ) {
+            $cancer->cursor_position( $x, $y + $row );
+            $cancer->write( $box->[3] );
+            $cancer->cursor_position( $x + $w - 1, $y + $row );
+            $cancer->write( $box->[4] );
+        }
 
-        # Restore original flags
-        my $raw = POSIX::Termios->new();
-        $raw->setcflag($cflag);
-        $raw->setlflag($lflag);
-        $raw->setoflag($oflag);
-        $raw->setiflag($iflag);
-        $raw->setcc( $_, $cc->[0] ) for 0 .. scalar @$cc;
-        $raw->setattr( $fileno, $attr );
+        #~ $cancer->write("hi");
+        $cancer->cursor_position( $x, $y + $h );
+        $cancer->write( $box->[5] . ( $box->[6] x ( $w - 2 ) ) . $box->[7] );
     }
 }
-my $cancer = Cancer->new();
 
-#~ $cancer->blank_screen;
-#~ {
-#~ $cancer->write_at( 1, 1, 'System colors:' );
-#~ for my $row ( 0 .. 1 ) {
-#~ for my $i ( 0 .. 7 ) {
-#~ $cancer->write_at(
-#~ 16 + ( $row * 2 ),
-#~ $i,
-#~ $cancer->color_indexed_fg( $i + ( 7 * !$row ) ) . $cancer->color_indexed_bg( $i + ( 7 * $row ) ) . sprintf '%2d',
-#~ $i + ( 7 * $row )
-#~ );
-#~ }
-#~ }
-#~ }                syswrite $tty_out, ;
-#~ $cancer->write("\x1b[?1000h\x1b[?1002h\x1b[?1015h\x1b[?1006h");
-#~ sub MOUSEBTNON()  { CSI . '?1002h' }
-#~ sub MOUSEANYON()  { CSI . '?1003h' }
-#~ sub MOUSEFOCUSON()  { CSI . '?1004h' }
-#~ sub MOUSESCROLLON()  { CSI . '?1007h' }
-#~ sub MOUSEEXTON()  { CSI . '?1005h' }
-#~ sub MOUSEPIXELON()  { CSI . '?1016h' }
+=encoding utf-8
+
+=head1 NAME
+
+Cancer - I'm afraid it's terminal...
+
+=head1 SYNOPSIS
+
+    use Cancer;
+    my $term = Cancer->new( mouse => 2 );
+
+=head1 DESCRIPTION
+
+Cancer is yet another text-based UI library.
+
+It's inspired by L<TermOx|https://github.com/a-n-t-h-o-n-y/TermOx> and
+L<termbox-go|https://github.com/nsf/termbox-go>. Use it to create
+L<TUI|https://en.wikipedia.org/wiki/Text-based_user_interface> in pure perl.
+
+=head1 Functions
+
+Cancer is needlessly object oriented so you'll need the following constructor first...
+
+=head2 C<new( [...] )>
+
+    my $term = Cancer->new( );
+
+Creates a new Cancer object.
+
+Expected parameters are all optional and include:
+
+=over
+
+=item C<alt_buffer>
+
+Boolean value.
+
+If C<true>, the alternate buffer is set. This provides a blank terminal screen while the normal buffer provides the existing terminal display.
+
+On destruction, the normal buffer is set after using the alternate buffer in order to restore the terminal screen to how it was before the application started.
+
+See L<the xterm docs|https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h2-The-Alternate-Screen-Buffer>
+
+=item C<mouse>
+
+Integer. Default value is C<1>.
+
+Options include:
+
+=over
+
+=item C<0>
+
+Generates no mouse events. Consider this 'off' mode.
+
+=item C<1>
+
+Generate mouse press and release events for all buttons and the scroll wheel. This would be 'normal' terminal mouse behavior.
+
+=item C<2>
+
+Normal (C<1>) events, plus mouse movement events while a button is pressed. The mouse is in a 'drag' mode.
+
+=item C<3>
+
+Normal (C<1>) events, plus mouse movement events are generated with or without a button pressed.
+
+=back
+
+=item C<cursor>
+
+Boolean value. Default value is C<false>.
+
+If C<true>, the cursor will be displayed on screen.
+
+=item C<winch>
+
+=back
+
+=head2 C<set_cursor( ... )>
+
+    $term->set_cursor( 1 );
+
+Set the cursor mode.
+
+=head2 C<set_mouse( ... )>
+
+    $term->set_mouse( 3 );
+
+Set the mouse mode.
+
+=head1 Author
+
+Sanko Robinson E<lt>sanko@cpan.orgE<gt> - http://sankorobinson.com/
+
+CPAN ID: SANKO
+
+=head1 License and Legal
+
+Copyright (C) 2024 by Sanko Robinson E<lt>sanko@cpan.orgE<gt>
+
+This program is free software; you can redistribute it and/or modify it under the terms of The Artistic License 2.0.
+See http://www.perlfoundation.org/artistic_license_2_0.  For clarification, see
+http://www.perlfoundation.org/artistic_2_0_notes.
+
+When separated from the distribution, all POD documentation is covered by the Creative Commons Attribution-Share Alike
+3.0 License. See http://creativecommons.org/licenses/by-sa/3.0/us/legalcode.  For clarification, see
+http://creativecommons.org/licenses/by-sa/3.0/us/.
+
+=begin stopwords
+
+termbox tty
+
+=end stopwords
+
+=cut
+
+my $box;
+my $cancer = Cancer->new(
+    mouse      => 3,
+    alt_buffer => 1,
+    winch      => sub ($cancer) {
+        $cancer->blank_screen;
+        $box->draw if $box;
+    }
+);
 $cancer->blank_screen;
 $cancer->set_title( 'Testing! ' . scalar localtime );
+$cancer->terminal_width;
 
 #~ $cancer->write_at( 0, 5,
 #~ Cancer::slow_blink() .
@@ -360,4 +531,6 @@ $cancer->set_title( 'Testing! ' . scalar localtime );
 #~ Cancer::reset() .
 #~ Cancer::osc_hyperlink( 'http://google.com/', Cancer::bold . Cancer::fg_rgb( 0, 29, 33 ) . Cancer::bg_rgb( 255, 0, 0 ) . 'Hi!' ) );
 #~ $cancer->cursor_down(10);
+$box = Cancer::Widget->new( x => 5, y => 10, w => 30, h => 10, cancer => $cancer );
+$box->draw;
 $cancer->loop;
