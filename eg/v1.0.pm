@@ -8,8 +8,8 @@ my $Win32 = $^O eq 'MSWin32' ? 1 : !1;
 class Cancer {
     use Fcntl qw[O_RDWR O_NDELAY O_NOCTTY];
     #
-    field $mouse //= 1;    # bool
-
+    field $mouse : param //= 1;    # bool
+    field $winch : param //= ();
     #
     field $tty_i;
     field $tty_o;
@@ -22,6 +22,9 @@ class Cancer {
     field $oflag;
     field $lflag;
     field $sig_winch;
+    field $mode;
+    field $attr;
+    field $cc;
     ADJUST {
         if ($Win32) {
             require IO::Handle;
@@ -36,62 +39,64 @@ class Cancer {
             #~ warn sprintf "(rows=%u, cols=%u, xpix=%u, ypix=%u)\n", $rows // 0, $cols // 0, $xpix, $ypix;
         }
         else {
-            #~ Carp::croak sprintf 'Cannot open terminal: %s', $! unless
-            #~ sysopen $tty_i,
-            #~ '/dev/tty',
-            #~ O_RDWR
-            #~ | O_NDELAY | O_NOCTTY
-            #~ ;
             $tty_i = \*STDIN;
             $tty_o = \*STDOUT;
-            Carp::croak 'Not a terminal.' unless -t $tty_i;
-            {
-                my $fileno = fileno $tty_i;
-                use POSIX qw[:termios_h];
+        }
+        Carp::carp 'Not a terminal.' unless -t $tty_i;
+        {
+            my $fileno = fileno $tty_i;
+            use POSIX qw[:termios_h];
+            my $raw = POSIX::Termios->new();
 
-                # Keep an original copy
-                my $raw = POSIX::Termios->new();
-                $raw->getattr($fileno);
-                my $winch;
+            # backup
+            my $_cflag = $cflag = $raw->getcflag;
+            my $_iflag = $iflag = $raw->getiflag;
+            my $_oflag = $oflag = $raw->getoflag;
+            my $_lflag = $lflag = $raw->getlflag;
+            $attr = $raw->getattr($fileno);
+            $cc   = [ map { $raw->getcc($_) } 1 .. 11 ];
 
-                # backup
-                my $_cflag = $cflag = $raw->getcflag;
-                my $_iflag = $iflag = $raw->getiflag;
-                my $_oflag = $oflag = $raw->getoflag;
-                my $_lflag = $lflag = $raw->getlflag;
+            # https://man7.org/linux/man-pages/man3/termios.3.html
+            $_iflag = $_iflag & ~( IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON );
+            $_oflag = $_oflag & ~OPOST;                                        # Disables post-processing output. Like turning \n into \r\n
+            $_lflag = $_lflag & ~( ECHO | ECHONL | ICANON | ISIG | IEXTEN );
+            $_cflag = $_cflag & ~(PARENB);
+            $_cflag |= CS8;
+            $raw->setiflag($_iflag);
+            $raw->setoflag($_oflag);
+            $raw->setlflag($_lflag);
+            $raw->setcflag($_cflag);
 
-                # https://man7.org/linux/man-pages/man3/termios.3.html
-                $_iflag = $_iflag & ~( IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON );
-                $raw->setiflag($_iflag);
-                $_oflag = $_oflag & ~OPOST;    # Disables post-processing output. Like turning \n into \r\n
-                $raw->setoflag($_oflag);
-                $_lflag = $_lflag & ~( ECHO | ECHONL | ICANON | ISIG | IEXTEN );
-                $raw->setlflag($_lflag);
-                $_cflag = $_cflag & ~( CSIZE | PARENB );
-                $_cflag |= CS8;
-                $raw->setcflag($_cflag);
+            #~ # This is setup for blocking reads.  In the past we attempted to
+            #~ # use non-blocking reads, but now a separate input loop and timer
+            #~ # copes with the problems we had on some systems (BSD/Darwin)
+            #~ # where close hung forever.
+            $raw->setcc( VMIN,  1 );
+            $raw->setcc( VTIME, 0 );
+            $raw->setattr( $fileno, TCSANOW );
 
-                #~ # This is setup for blocking reads.  In the past we attempted to
-                #~ # use non-blocking reads, but now a separate input loop and timer
-                #~ # copes with the problems we had on some systems (BSD/Darwin)
-                #~ # where close hung forever.
-                $raw->setcc( VMIN,  1 );
-                $raw->setcc( VTIME, 0 );
-                $raw->setattr( $fileno, TCSANOW );
-                {
-                    #
-                    $sig_winch = $SIG{WINCH} if defined $SIG{WINCH};
-                    $SIG{WINCH} = sub {
-                        $sig_winch->($self) if defined $sig_winch;    # call default
-                        return              if !$winch;               # no defined resize handler
-                        my ( $rows, $cols ) = $self->get_win_size();
-                        $winch->( $self, Cancer::Event::Resize->new( w => $cols, h => $rows ) );
-                    };
-                    $SIG{WINCH}->($self) if defined $SIG{WINCH};
-                }
-            }
+            #~ # Debug
+            #~ my $raw = POSIX::Termios->new();
+            #~ use Data::Dump;
+            #~ $raw->getattr($fileno);
+            #~ warn $raw->getcflag;
+            #~ warn $raw->getiflag;
+            #~ warn $raw->getispeed;
+            #~ warn $raw->getlflag;
+            #~ warn $raw->getoflag;
+            #~ warn $raw->getospeed;
+        }
+        {
+            #
+            $sig_winch = $SIG{WINCH} if defined $SIG{WINCH};
+            $SIG{WINCH} = sub {
+                $sig_winch->($self) if defined $sig_winch;    # call default
 
-            #~ $tty_o = $tty_i;
+                #~ return              if !$winch;               # no defined resize handler
+                #~ my ( $rows, $cols ) = $self->get_win_size();
+                #~ $winch->( $self, Cancer::Event::Resize->new( w => $cols, h => $rows ) ) if $winch;
+            };
+            $SIG{WINCH}->($self) if defined $SIG{WINCH};
         }
         $select_i->add($tty_i);
         $select_o->add($tty_o);
@@ -279,6 +284,7 @@ class Cancer {
     my $letters = '';
 
     method parse_event ($data) {
+        return if !length $data;
         my $first = substr $data, 1;
         if ( $data =~ /^\e/ ) {
             $self->write_at( 0, 6, 'Escape' );
@@ -311,17 +317,14 @@ class Cancer {
         $self->blank_screen;
         $SIG{WINCH} = $sig_winch if defined $sig_winch;    # Restore original winch
 
-        # Restore original copy
+        # Restore original flags
         my $raw = POSIX::Termios->new();
-        $raw->setattr( $fileno, TCSANOW );
-        $raw->getattr($fileno) if defined $fileno;
-        $raw->setcflag($cflag) if defined $cflag;
-        $raw->setiflag($iflag) if defined $iflag;
-        $raw->setoflag($oflag) if defined $oflag;
-        $raw->setlflag($lflag) if defined $lflag;
-        #
-        #~ close $tty_i;
-        #~ close $tty_o;
+        $raw->setcflag($cflag);
+        $raw->setlflag($lflag);
+        $raw->setoflag($oflag);
+        $raw->setiflag($iflag);
+        $raw->setcc( $_, $cc->[0] ) for 0 .. scalar @$cc;
+        $raw->setattr( $fileno, $attr );
     }
 }
 my $cancer = Cancer->new();
