@@ -1,0 +1,95 @@
+---
+jobs:
+  linux:
+    name: 'Linux'
+    needs:
+      - setup
+    strategy:
+      fail-fast: false
+      matrix:
+        flags: '${{ fromJSON(needs.setup.outputs.matrix).flags }}'
+        os:
+          - ubuntu-latest
+        perl: '${{ fromJSON(needs.setup.outputs.matrix).perl }}'
+      max-parallel: 25
+    uses: sanko/Terminal/.github/workflows/matrix.yml@main
+    with:
+      flags: '${{ matrix.flags }}'
+      os: '${{ matrix.os }}'
+      perl: '${{ matrix.perl }}'
+  macos:
+    name: 'macOS'
+    needs:
+      - setup
+    strategy:
+      fail-fast: false
+      matrix:
+        exclude:
+          - flags: -Dusequadmath
+            os: macos-latest
+          - flags: -Dusethreads
+            os: macos-latest
+        flags: '${{ fromJSON(needs.setup.outputs.matrix).flags }}'
+        os:
+          - macos-latest
+        perl: '${{ fromJSON(needs.setup.outputs.matrix).perl }}'
+      max-parallel: 25
+    uses: sanko/Terminal/.github/workflows/matrix.yml@main
+    with:
+      flags: '${{ matrix.flags }}'
+      os: '${{ matrix.os }}'
+      perl: '${{ matrix.perl }}'
+  results:
+    name: Results
+    needs:
+      - macos
+      - win32
+      - linux
+    runs-on: ubuntu-latest
+    steps:
+      - name: Do something
+        run: echo "Do something"
+      - name: Download test results
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Report test results
+        run: ls -R artifacts
+  setup:
+    name: Generate Testing Matrix
+    outputs:
+      matrix: '${{ steps.matrix.outputs.matrix }}'
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          DATA: |
+            {
+              "perl": ["5.38.0", "5.36.0"],
+              "flags": [""]
+            }
+        id: matrix
+        run: "jq -rn 'env.DATA | fromjson | @json \"matrix=\\(.)\"' > $GITHUB_OUTPUT\n"
+  win32:
+    name: 'Windows'
+    needs:
+      - setup
+    strategy:
+      fail-fast: false
+      matrix:
+        flags: '${{ fromJSON(needs.setup.outputs.matrix).flags }}'
+        os:
+          - windows-2019
+        perl: '${{ fromJSON(needs.setup.outputs.matrix).perl }}'
+      max-parallel: 25
+    uses: sanko/Terminal/.github/workflows/matrix.yml@main
+    with:
+      flags: '${{ matrix.flags }}'
+      os: '${{ matrix.os }}'
+      perl: '${{ fromJSON(needs.setup.outputs.matrix).perl }}'
+name: Mega Matrix CI
+on:
+  pull_request: ~
+  push: ~
+  schedule:
+    - cron: 42 5 * * 0
+  workflow_dispatch: ~

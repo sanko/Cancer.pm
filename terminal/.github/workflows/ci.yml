@@ -1,7 +1,7 @@
 ---
 jobs:
   build:
-    name: 'Perl ${{ matrix.perl }}'
+    name: '{{ matrix.os }}-v${{ matrix.perl }}'
     runs-on: '${{ matrix.os }}'
     steps:
       - uses: actions/checkout@v3
@@ -24,14 +24,8 @@ jobs:
           - 5.38
 name: CI
 on:
-  workflow_call:
-    inputs:
-      flags:
-        required: true
-        type: string
-      os:
-        required: true
-        type: string
-      perl:
-        required: true
-        type: string
+  pull_request: ~
+  push: ~
+  schedule:
+    - cron: 42 5 * * 0
+  workflow_dispatch: ~

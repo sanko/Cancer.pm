@@ -4,7 +4,66 @@ $|++;
 #
 use Data::Dump;
 #
+package Cancer::Log 0.5 {
+    use v5.36;
+    use Path::Tiny;
+    sub new      ( $class, $level ) { }
+    sub is_info  ($self)            { }
+    sub is_debug ($self)            { }
+    sub context() { }
+    #
+    sub error ( $self, $msg ) { }
+    #
+    sub warn    ( $self, $msg ) { }
+    sub warning ( $self, $msg ) { }
+    #
+    sub info ( $self, $msg ) { }
+    #
+    sub errorf ( $self, $msg, @fields ) { }
+    sub debugf ( $self, $msg, @fields ) { }
+}
+
+package Devel::Cancer 0.5 {
+    use v5.36;
+
+    # Devel::Trace but Cancerous; perl -d:Cancer script.pl
+    our $TRACE       = 0;                                                                              # off by default
+    our $FORMAT      = '>> %file%:%line%: %code%';                                                     # allow custom log line formats
+    our $TIME_FORMAT = '%Y-%m-%dT%H:%M:%S' . ( $POSIX::strftime::GNU::VERSION ? ',%N' : '' ) . '%z';
+    our $FH          = \*STDERR;
+    use Time::HiRes qw[gettimeofday];
+    eval q{use POSIX 'strftime';} unless eval q{use POSIX::strftime::GNU;};                            # POSIX is core but no nanosecond support
+    use Exporter 'import';
+    our @EXPORT_OK = qw[$TRACE trace $FH];                                                             # symbols to export on request
+
+    # %package% - Print current package
+    # %file% - Print path
+    # %line% - Print current line number
+    # %date% - Print date
+    # %date:[%D, %Y]% - Accept strftime format
+    # %code% - Print current line of code
+    sub DB::DB {
+        $TRACE || return;
+        my ( $package, $filename, $line ) = caller;
+        my $code = \@{"::_<$filename"};
+        my ( $t, $nsec ) = gettimeofday;
+        my @localtime = localtime $t;
+        $localtime[0] += $nsec / 10e5;
+        my %args = ( package => $package, file => $filename, line => $line, date => strftime( $TIME_FORMAT, @localtime ), code => $code->[$line] );
+        print $FH $FORMAT =~ s[
+%
+        (?:(?'var'date)\:\[(?'format'.+?)\]|
+        (?'var'package|file|line|date|code))
+%]
+[$+{var} eq 'date' && defined $+{format} ? strftime($+{format}, @localtime) : $args{$+{var}}]gerx;
+    }
+    sub trace  ($switch) { $TRACE  = !!$switch }
+    sub format ($format) { $FORMAT = $format }
+    sub handle ($handle) { $FH     = $handle }
+}
+#
 package Cancer 0.01 {
+    use v5.36;
     my $ControlType = {
         BELL                  => 1,
         CARRIAGE_RETURN       => 2,
@@ -29,9 +88,10 @@ package Cancer 0.01 {
     }
 }
 
-package Cancer::Segment {
+package Cancer::Segment 0.5 {
+    use v5.36;
 
-    sub new ( $class, $text, $style ||= Cancer::Style->new(), $control = undef ) {
+    sub new ( $class, $text, $style = Cancer::Style->new(), $control = undef ) {
         bless { text => $text, style => $style, control => $control }, $class;
     }
 
@@ -40,7 +100,8 @@ package Cancer::Segment {
     }
 }
 
-package Cancer::Style {
+package Cancer::Style 0.5 {
+    use v5.36;
 
     # color     Color
     # bgcolor   Color
@@ -92,10 +153,12 @@ package Cancer::Style {
 #~ sub disable_hide()      { SGR 28 }
 #~ sub disable_strike()    { SGR 29 }
 package Cancer::Color {
+    use v5.36;
     sub new ($class) { bless {}, $class }
 }
 
 package Cancer::Terminal {
+    use v5.36;
     use Carp;
 
     # C0 control codes
@@ -119,20 +182,20 @@ package Cancer::Terminal {
     sub APC() { ESC . '_' }
 
     # Control Sequence Introducer (CSI)
-    sub CUU ( $n //= 1 ) { CSI . $n . 'A' }
-    sub CUD ( $n //= 1 ) { CSI . $n . 'B' }
-    sub CUF ( $n //= 1 ) { CSI . $n . 'C' }
-    sub CUB ( $n //= 1 ) { CSI . $n . 'D' }
-    sub CNL ( $n //= 1 ) { CSI . $n . 'E' }
-    sub CPL ( $n //= 1 ) { CSI . $n . 'F' }
-    sub CHA ( $n //= 1 ) { CSI . $n . 'G' }
-    sub CUP ( $n //= 1, $m //= 1 ) { CSI . $n . ';' . $m . 'H' }
-    sub ED  ( $n //= 1 )           { CSI . $n . 'J' }
-    sub EL  ( $n //= 1 )           { CSI . $n . 'K' }
-    sub SU  ( $n //= 1 )           { CSI . $n . 'S' }
-    sub SD  ( $n //= 1 )           { CSI . $n . 'T' }
-    sub HVP ( $n //= 1, $m //= 1 ) { CSI . $n . 'f' }
-    sub SGR ( $n //= 1 )           { CSI . $n . 'm' }
+    sub CUU ( $n = 1 )         { CSI . $n . 'A' }
+    sub CUD ( $n = 1 )         { CSI . $n . 'B' }
+    sub CUF ( $n = 1 )         { CSI . $n . 'C' }
+    sub CUB ( $n = 1 )         { CSI . $n . 'D' }
+    sub CNL ( $n = 1 )         { CSI . $n . 'E' }
+    sub CPL ( $n = 1 )         { CSI . $n . 'F' }
+    sub CHA ( $n = 1 )         { CSI . $n . 'G' }
+    sub CUP ( $n = 1, $m = 1 ) { CSI . $n . ';' . $m . 'H' }
+    sub ED  ( $n = 1 )         { CSI . $n . 'J' }
+    sub EL  ( $n = 1 )         { CSI . $n . 'K' }
+    sub SU  ( $n = 1 )         { CSI . $n . 'S' }
+    sub SD  ( $n = 1 )         { CSI . $n . 'T' }
+    sub HVP ( $n = 1, $m = 1 ) { CSI . $n . 'f' }
+    sub SGR ( $n = 1 )         { CSI . $n . 'm' }
     sub DSR ( ) { CSI . '6n' }    # Look for cursor pos in CSI$n;$mR
 
     # Private CSI
@@ -187,13 +250,13 @@ package Cancer::Terminal {
     sub disable_invert()    { SGR 27 }
     sub disable_hide()      { SGR 28 }
     sub disable_strike()    { SGR 29 }
-    sub fg_indexed ($c)                                { Carp::confess 'foreground color should be between 0 and 7' unless 0 <= $c <= 7; SGR $c + 30 }
-    sub fg_8bit    ($c)                                { SGR 38 . ';5;' . $c }
-    sub fg_rgb     ( $r //= '', $g //= '', $b //= '' ) { SGR 38 . ';2;' . $r . ';' . $g . ';' . $b }
+    sub fg_indexed ($c)                          { Carp::confess 'foreground color should be between 0 and 7' unless 0 <= $c <= 7; SGR $c + 30 }
+    sub fg_8bit    ($c)                          { SGR 38 . ';5;' . $c }
+    sub fg_rgb     ( $r = '', $g = '', $b = '' ) { SGR 38 . ';2;' . $r . ';' . $g . ';' . $b }
     sub fg_reset() { SGR 39 }
-    sub bg_indexed ($c)                                { Carp::confess 'background color should be between 0 and 7' unless 0 <= $c <= 7; SGR $c + 40 }
-    sub bg_8bit    ($c)                                { SGR 48 . ';5;' . $c }
-    sub bg_rgb     ( $r //= '', $g //= '', $b //= '' ) { SGR 48 . ';2;' . $r . ';' . $g . ';' . $b }
+    sub bg_indexed ($c)                          { Carp::confess 'background color should be between 0 and 7' unless 0 <= $c <= 7; SGR $c + 40 }
+    sub bg_8bit    ($c)                          { SGR 48 . ';5;' . $c }
+    sub bg_rgb     ( $r = '', $g = '', $b = '' ) { SGR 48 . ';2;' . $r . ';' . $g . ';' . $b }
     sub bg_reset() { SGR 49 }
 
     # Underline color. VTE, Kitty, mintty, and iTerm2
@@ -206,7 +269,7 @@ package Cancer::Terminal {
 
     #~ https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda
     #~ https://github.com/Alhadis/OSC8-Adoption
-    sub osc_hyperlink ( $link, $text //= $link ) {
+    sub osc_hyperlink ( $link, $text = $link ) {
         ESC . OSC . qq'8;;' . $link . ST . $text . ESC . OSC . '8;;' . ST;
     }
     #

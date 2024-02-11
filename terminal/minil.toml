@@ -1,5 +1,5 @@
 name = "Cancer"
-badges = ["github-actions/linux.yaml", "github-actions/windows.yaml", "github-actions/osx.yaml", "metacpan"]
+badges = ["github-actions/ci.yaml", "metacpan"]
 module_maker="ModuleBuildTiny"
 static_install = "auto"
 license = "artistic_2"

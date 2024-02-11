@@ -1,4 +1,4 @@
-
+[![Actions Status](https://github.com/sanko/Terminal/actions/workflows/ci.yaml/badge.svg)](https://github.com/sanko/Terminal/actions) [![MetaCPAN Release](https://badge.fury.io/pl/Cancer.svg)](https://metacpan.org/release/Cancer)
 # NAME
 
 Cancer - I'm afraid it's terminal...'
