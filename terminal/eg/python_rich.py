@@ -13,3 +13,7 @@ inspect(fragments)
 #~ https://github.com/Textualize/rich/blob/26152e9cc95eef9c8f363d7bf1dfda426275348d/rich/segment.py#L56
 
 print(text)
+
+inspect(console)
+
+inspect(console.move_to(20, 20))

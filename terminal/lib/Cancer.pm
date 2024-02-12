@@ -61,42 +61,263 @@ package Devel::Cancer 0.5 {
     sub format ($format) { $FORMAT = $format }
     sub handle ($handle) { $FH     = $handle }
 }
+
+package Cancer::ColorSystem {
+    use Scalar::Util qw[dualvar];
+    use constant { EIGHT_BIT => dualvar( 0, 'EIGHT_BIT' ), STANDARD => dualvar( 1, 'STANDARD' ), TRUECOLOR => dualvar( 2, 'TRUECOLOR' ) };
+}
 #
 package Cancer 0.01 {
     use v5.36;
-    my $ControlType = {
-        BELL                  => 1,
-        CARRIAGE_RETURN       => 2,
-        HOME                  => 3,
-        CLEAR                 => 4,
-        SHOW_CURSOR           => 5,
-        HIDE_CURSOR           => 6,
-        ENABLE_ALT_SCREEN     => 7,
-        DISABLE_ALT_SCREEN    => 8,
-        CURSOR_UP             => 9,
-        CURSOR_DOWN           => 10,
-        CURSOR_FORWARD        => 11,
-        CURSOR_BACKWARD       => 12,
-        CURSOR_MOVE_TO_COLUMN => 13,
-        CURSOR_MOVE_TO        => 14,
-        ERASE_IN_LINE         => 15,
-        SET_WINDOW_TITLE      => 16
-    };
+    my $Renderer = { LIVE => 1 };
+    my $TermColors
+        = { kitty => Cancer::ColorSystem::EIGHT_BIT(), '256color' => Cancer::ColorSystem::EIGHT_BIT(), '16color' => Cancer::ColorSystem::STANDARD() };
 
     sub ControlCode ( $type, $alpha = undef, $beta = undef ) {
         ...;
+    }
+
+    sub new ( $class, %args ) {
+        $args{fh_out} //= \*STDOUT;
+        $args{fh_in}  //= \*STDIN;
+        if ( $args{terminal_type} // '' eq 'DUMB' ) {
+            $args{width}  //= 80;
+            $args{height} //= 25;
+        }
+        elsif ( !defined $args{width} || !defined $args{height} ) {
+            my ( $w, $h ) = _get_terminal_dimensions( $args{fh_out} );
+            $args{width}  //= $w;
+            $args{height} //= $h;
+        }
+        #
+        bless {
+            fh_out         => $args{fh_out},
+            fh_in          => $args{fh_in},
+            size           => [ $args{width}, $args{height} ],
+            legacy_windows => !1,                                # TODO: detect old skool cmd
+            min_width      => $args{min_width}  // $args{width},
+            min_height     => $args{min_height} // $args{height},
+            max_width      => $args{max_width}  // $args{width},
+            max_height     => $args{max_height} // $args{height},
+            width          => $args{width},
+            height         => $args{height},
+            is_terminal    => $args{is_terminal} // !!-t $args{stdin},
+            encoding       => $args{encoding}    // 'utf-8',
+            justify        => $args{justify}     // undef,
+            overlow        => $args{overlow}     // undef,
+            no_wrap        => $args{no_wrap}     // !1,
+            highlight      => $args{highlight}   // undef,
+            markup         => $args{markup}      // undef,
+            emoji_variant  => $args{emoji_variant} //= 'emoji',
+            x              => 0,
+            y              => 0,
+            cache_out      => '',
+            cache_in       => '',
+            renderer       => $Renderer->{Live}
+        }, $class;
+    }
+    #
+    sub ascii_only ($self) {
+        return $self->{encoding} !~ m[^utf]i;
+    }
+
+    sub height ( $self, $height = () ) {
+        $self->{height}     = $height if defined $height;
+        $self->{max_height} = $height if $height > $self->{max_height};
+        $self->{height};
+    }
+
+    sub width ( $self, $width = () ) {
+        $self->{width}     = $width                      if defined $width;
+        $self->{max_width} = $self->{min_width} = $width if $width > $self->{max_width};
+        $self->{width};
+    }
+
+    sub size ( $self, $width = (), $height = () ) {
+        if ( defined $width && defined $height ) {    # only update if both are defined
+            $self->width($width);
+            $self->height($height);
+        }
+        ( $self->{width}, $self->{height} );
+    }
+
+    # Output
+    sub newline ( $self, $count = 1 ) {
+        Cancer::Segment->new( "\n" x $count );
+    }
+
+    sub bell ($self) {
+        Cancer::Segment->new( undef, undef, [ Cancer::Segment::BELL() ] );
+    }
+
+    sub move_to ( $self, $x, $y ) {
+        Cancer::Segment->new( undef, undef, [ Cancer::Segment::CURSOR_MOVE_TO(), $x, $y ] );
+    }
+
+    # Render system
+    sub render ( $self, $lines, $x = (), $y = () ) {
+        if ( defined $x && defined $y ) {
+            $self->{x} = $x;
+            $self->{y} = $y;
+            unshift @$lines, $self->move_to( $x, $y );
+        }
+        else {
+            $x = $self->{x};
+            $y = $self->{y};
+        }
+        Cancer::Renderer::Live::render($lines);
+    }
+
+    sub write ( $self, $data //= () ) {
+        $self->{cache_out} .= $data if defined $data;
+        return                      if !length $self->{cache_out};
+
+        #~ if ( !$select_o->can_write() ) {
+        #~ $cache_o .= $data;
+        #~ return;
+        #~ }
+        my $wrote = syswrite $self->{fh_out}, $self->{cache_out}, length $self->{cache_out};
+        substr $self->{cache_out}, 0, $wrote, '';
+        $wrote;
+    }
+
+    sub read ( $self, $length //= 1024 ) {
+
+        #~ $select_i->can_read() || return;
+        sysread $self->{fh_in}, my ($ret), $length;
+        return $ret;
+    }
+    #
+    sub _TIOCGWINSZ () {    # See Perl::osnames
+        return 0x800c     if $^O =~ qr/\A(?:beos)\z/;
+        return 0x40087468 if $^O =~ qr/\A(?:MacOS|iphoneos|bitrig|dragonfly|(free|net|open)bsd|bsdos)\z/;
+        return 0x5468     if $^O =~ qr/\A(?:solaris|sunos)\z/;
+        return 0x5413       # Linux and android
+    }
+
+    sub _get_terminal_dimensions ($fh) {
+        my $winsize = "\0" x 8;
+        ( ( ioctl( $fh, _TIOCGWINSZ(), $winsize ) ) ? ( unpack 'S4', $winsize ) : ( map { $_ * 0 } ( 1 .. 4 ) ) );
+    }
+}
+
+package Cancer::Renderer::Live 0.5 {
+
+    sub render ($lines) {
+        map { $_->render } @$lines;
     }
 }
 
 package Cancer::Segment 0.5 {
     use v5.36;
+    use Scalar::Util qw[dualvar];
+    use constant {
+        BELL                  => dualvar( 1,  'BELL' ),
+        CARRIAGE_RETURN       => dualvar( 2,  'CARRIAGE_RETURN' ),
+        HOME                  => dualvar( 3,  'HOME' ),
+        CLEAR                 => dualvar( 4,  'CLEAR' ),
+        SHOW_CURSOR           => dualvar( 5,  'SHOW_CURSOR' ),
+        HIDE_CURSOR           => dualvar( 6,  'HIDE_CURSOR' ),
+        ENABLE_ALT_SCREEN     => dualvar( 7,  'ENABLE_ALT_SCREEN' ),
+        DISABLE_ALT_SCREEN    => dualvar( 8,  'DISABLE_ALT_SCREEN' ),
+        CURSOR_UP             => dualvar( 9,  'CURSOR_UP' ),
+        CURSOR_DOWN           => dualvar( 10, 'CURSOR_DOWN' ),
+        CURSOR_FORWARD        => dualvar( 11, 'CURSOR_FORWARD' ),
+        CURSOR_BACKWARD       => dualvar( 12, 'CURSOR_BACKWARD' ),
+        CURSOR_MOVE_TO_COLUMN => dualvar( 13, 'CURSOR_MOVE_TO_COLUMN' ),
+        CURSOR_MOVE_TO        => dualvar( 14, 'CURSOR_MOVE_TO' ),
+        ERASE_IN_LINE         => dualvar( 15, 'ERASE_IN_LINE' ),
+        SET_WINDOW_TITLE      => dualvar( 16, 'SET_WINDOW_TITLE' ),
+        OUTPUT                => dualvar( 17, 'OUTPUT' )
+    };
 
-    sub new ( $class, $text, $style = Cancer::Style->new(), $control = undef ) {
+    sub new ( $class, $text, $style = Cancer::Style->new(), $control = [OUTPUT] ) {
         bless { text => $text, style => $style, control => $control }, $class;
     }
 
     sub render ($self) {
-        return $self->{style}->open() . $self->{text} . $self->{style}->close();
+        CORE::state $c //= {
+            BELL => sub ($s) {
+                Cancer::Terminal::BEL();
+            },
+            CARRIAGE_RETURN => sub ($s) {
+                use Data::Dump;
+                ddx $s;
+                ...;
+            },
+            HOME => sub ($s) {
+                use Data::Dump;
+                ddx $s;
+                ...;
+            },
+            CLEAR => sub ($s) {
+                use Data::Dump;
+                ddx $s;
+                ...;
+            },
+            SHOW_CURSOR => sub ($s) {
+                use Data::Dump;
+                ddx $s;
+                ...;
+            },
+            HIDE_CURSOR => sub ($s) {
+                use Data::Dump;
+                ddx $s;
+                ...;
+            },
+            ENABLE_ALT_SCREEN => sub ($s) {
+                use Data::Dump;
+                ddx $s;
+                ...;
+            },
+            DISABLE_ALT_SCREEN => sub ($s) {
+                use Data::Dump;
+                ddx $s;
+                ...;
+            },
+            CURSOR_UP => sub ($s) {
+                use Data::Dump;
+                ddx $s;
+                ...;
+            },
+            CURSOR_DOWN => sub ($s) {
+                use Data::Dump;
+                ddx $s;
+                ...;
+            },
+            CURSOR_FORWARD => sub ($s) {
+                use Data::Dump;
+                ddx $s;
+                ...;
+            },
+            CURSOR_BACKWARD => sub ($s) {
+                use Data::Dump;
+                ddx $s;
+                ...;
+            },
+            CURSOR_MOVE_TO_COLUMN => sub ($s) {
+                use Data::Dump;
+                ddx $s;
+                ...;
+            },
+            CURSOR_MOVE_TO => sub ($s) {
+                Cancer::Terminal::CUP( $self->{control}->[ 1, 2 ] );
+            },
+            ERASE_IN_LINE => sub ($s) {
+                use Data::Dump;
+                ddx $s;
+                ...;
+            },
+            SET_WINDOW_TITLE => sub ($s) {
+                use Data::Dump;
+                ddx $s;
+                ...;
+            },
+            OUTPUT => sub ($s) {
+                return $s->{style}->open() . $s->{text} . $s->{style}->close();
+            },
+        };
+        return $c->{ $self->{control}[0] }->($self);
     }
 }
 
@@ -119,8 +340,8 @@ package Cancer::Style 0.5 {
         $ret .= Cancer::Terminal::italic()                        if $self->{italic};
         $ret .= Cancer::Terminal::slow_blink()                    if $self->{blink};
         $ret .= Cancer::Terminal::fast_blink()                    if $self->{blink2};
-        $ret .= Cancer::Terminal::bg_rgb( $self->{bgcolor}->rgb ) if $self->{bgcolor} && $self->{bgcolor}->{type} == Cancer::Color::TRUECOLOR();
-        $ret .= Cancer::Terminal::fg_rgb( $self->{color}->rgb )   if $self->{color}   && $self->{color}->{type} == Cancer::Color::TRUECOLOR();
+        $ret .= Cancer::Terminal::bg_rgb( $self->{bgcolor}->rgb ) if $self->{bgcolor} && $self->{bgcolor}->{type} == Cancer::ColorSystem::TRUECOLOR();
+        $ret .= Cancer::Terminal::fg_rgb( $self->{color}->rgb )   if $self->{color}   && $self->{color}->{type} == Cancer::ColorSystem::TRUECOLOR();
         $ret;
     }
 
@@ -158,7 +379,6 @@ package Cancer::Style 0.5 {
 #~ sub disable_strike()    { SGR 29 }
 package Cancer::Color {
     use v5.36;
-    use constant { STANDARD => 0, TRUECOLOR => 1 };
 
     sub new ( $class, $color ) {
 
@@ -167,10 +387,12 @@ package Cancer::Color {
         bless {
             raw => $color, (
                 $color =~ m/^#?(?'r'[[:xdigit:]]{2})(?'g'[[:xdigit:]]{2})(?'b'[[:xdigit:]]{2})$/ ?
-                    ( type => TRUECOLOR, triplet => Cancer::ColorTriplet->new( hex $+{r}, hex $+{g}, hex $+{b} ) ) : ()
+                    ( type => Cancer::ColorSystem::TRUECOLOR(), triplet => Cancer::ColorTriplet->new( hex $+{r}, hex $+{g}, hex $+{b} ) ) : ()
             ), (
-                $color =~ m/^#?(?'r'[[:xdigit:]])(?'g'[[:xdigit:]])(?'b'[[:xdigit:]])$/ ?
-                    ( type => TRUECOLOR, triplet => Cancer::ColorTriplet->new( hex $+{r} . $+{r}, hex $+{g} . $+{g}, hex $+{b} . $+{b} ) ) : ()
+                $color =~ m/^#?(?'r'[[:xdigit:]])(?'g'[[:xdigit:]])(?'b'[[:xdigit:]])$/ ? (
+                    type    => Cancer::ColorSystem::TRUECOLOR(),
+                    triplet => Cancer::ColorTriplet->new( hex $+{r} . $+{r}, hex $+{g} . $+{g}, hex $+{b} . $+{b} )
+                ) : ()
             )
         }, $class;
     }
