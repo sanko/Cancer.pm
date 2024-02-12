@@ -1,7 +1,7 @@
 ---
 jobs:
   linux:
-    name: 'Linux'
+    name: 'Linux/v${{matrix.perl}}'
     needs:
       - setup
     strategy:
@@ -18,7 +18,7 @@ jobs:
       os: '${{ matrix.os }}'
       perl: '${{ matrix.perl }}'
   macos:
-    name: 'macOS'
+    name: 'macOS/v${{matrix.perl}}'
     needs:
       - setup
     strategy:
@@ -70,7 +70,7 @@ jobs:
         id: matrix
         run: "jq -rn 'env.DATA | fromjson | @json \"matrix=\\(.)\"' > $GITHUB_OUTPUT\n"
   win32:
-    name: 'Windows'
+    name: 'Windows/v${{matrix.perl}}'
     needs:
       - setup
     strategy:
@@ -85,11 +85,11 @@ jobs:
     with:
       flags: '${{ matrix.flags }}'
       os: '${{ matrix.os }}'
-      perl: '${{ fromJSON(needs.setup.outputs.matrix).perl }}'
+      perl: '${{ matrix.perl }}'
 name: Mega Matrix CI
 on:
-  pull_request: ~
-  push: ~
-  schedule:
-    - cron: 42 5 * * 0
+  #~ pull_request: ~
+  #~ push: ~
+  #~ schedule:
+  #~   - cron: 42 5 * * 0
   workflow_dispatch: ~

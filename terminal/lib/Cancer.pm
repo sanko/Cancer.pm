@@ -115,15 +115,19 @@ package Cancer::Style 0.5 {
 
     sub open ($self) {
         my $ret = '';
-        $ret .= Cancer::Terminal::bold()       if $self->{bold};
-        $ret .= Cancer::Terminal::italic()     if $self->{italic};
-        $ret .= Cancer::Terminal::slow_blink() if $self->{blink};
-        $ret .= Cancer::Terminal::fast_blink() if $self->{blink2};
+        $ret .= Cancer::Terminal::bold()                          if $self->{bold};
+        $ret .= Cancer::Terminal::italic()                        if $self->{italic};
+        $ret .= Cancer::Terminal::slow_blink()                    if $self->{blink};
+        $ret .= Cancer::Terminal::fast_blink()                    if $self->{blink2};
+        $ret .= Cancer::Terminal::bg_rgb( $self->{bgcolor}->rgb ) if $self->{bgcolor} && $self->{bgcolor}->{type} == Cancer::Color::TRUECOLOR();
+        $ret .= Cancer::Terminal::fg_rgb( $self->{color}->rgb )   if $self->{color}   && $self->{color}->{type} == Cancer::Color::TRUECOLOR();
         $ret;
     }
 
     sub close ($self) {
         my $ret = '';
+        $ret .= Cancer::Terminal::bg_reset()        if $self->{bgcolor};
+        $ret .= Cancer::Terminal::fg_reset()        if $self->{color};
         $ret .= Cancer::Terminal::disable_blink()   if $self->{blink2} || $self->{blink};
         $ret .= Cancer::Terminal::normal_emphasis() if $self->{italic};
         $ret .= Cancer::Terminal::normal_weight()   if $self->{bold};
@@ -154,7 +158,34 @@ package Cancer::Style 0.5 {
 #~ sub disable_strike()    { SGR 29 }
 package Cancer::Color {
     use v5.36;
-    sub new ($class) { bless {}, $class }
+    use constant { STANDARD => 0, TRUECOLOR => 1 };
+
+    sub new ( $class, $color ) {
+
+        #~ $color = Cancer::ColorTriplet->new( hex $+{r} . $+{r}, hex $+{g} . $+{g}, hex $+{b} . $+{b} )
+        #~ if $color =~ m/^#(?'r'[[:xdigit:]])(?'g'[[:xdigit:]])(?'b'[[:xdigit:]])$/;
+        bless {
+            raw => $color, (
+                $color =~ m/^#?(?'r'[[:xdigit:]]{2})(?'g'[[:xdigit:]]{2})(?'b'[[:xdigit:]]{2})$/ ?
+                    ( type => TRUECOLOR, triplet => Cancer::ColorTriplet->new( hex $+{r}, hex $+{g}, hex $+{b} ) ) : ()
+            ), (
+                $color =~ m/^#?(?'r'[[:xdigit:]])(?'g'[[:xdigit:]])(?'b'[[:xdigit:]])$/ ?
+                    ( type => TRUECOLOR, triplet => Cancer::ColorTriplet->new( hex $+{r} . $+{r}, hex $+{g} . $+{g}, hex $+{b} . $+{b} ) ) : ()
+            )
+        }, $class;
+    }
+
+    sub rgb ($self) {
+        ( $self->{triplet}{red}, $self->{triplet}{green}, $self->{triplet}{blue} )
+    }
+}
+
+package Cancer::ColorTriplet {
+    use v5.36;
+
+    sub new ( $class, $red, $green, $blue ) {
+        bless { red => $red, green => $green, blue => $blue }, $class;
+    }
 }
 
 package Cancer::Terminal {
@@ -302,13 +333,7 @@ package Cancer::Terminal {
         sprintf CSI . '%d;%dH%s', $y, $x, $string;
     }
 }
-#
-my $list = [
-    Cancer::Segment->new( 'hi', Cancer::Style->new( bold   => 1 ) ), Cancer::Segment->new(' '),
-    Cancer::Segment->new( 'hi', Cancer::Style->new( italic => 1 ) ), Cancer::Segment->new("\n")
-];
-ddx $list;
-print join '', map { $_->render } @$list;
+1;
 __END__
 ╭────────────────────────── <class 'list'> ───────────────────────────╮
 │ Built-in mutable sequence.                                          │
