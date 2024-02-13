@@ -66,14 +66,18 @@ my $list = [
     $cancer->move_to( 5, 5 ),
     $cancer->bell,
     Cancer::Segment->new(
-        'hi', Cancer::Style->new( blink => 1, bold => 1, color => Cancer::Color->new('#339933'), bgcolor => Cancer::Color->new('#0fc') )
+        "hi " . "🏴\0e0067\0e0062\0e0065\0e006e\0e0067\0e007f",
+        , Cancer::Style->new( blink => 1, bold => 1, color => Cancer::Color->new('#339933'), bgcolor => Cancer::Color->new('#0fc') )
     ),
-    Cancer::Segment->new(' '),
+    $cancer->newline(3),
     Cancer::Segment->new( 'hi', Cancer::Style->new( italic => 1 ) ),
-    Cancer::Segment->new("\n")
+    $cancer->newline
 ];
 ddx $list;
 print $cancer->render($list);
+my %hash;
+CORE::say sprintf '%s() {"%s"}', $_, $hash{$_} for sort keys %hash;
+ddx \%hash;
 __END__
 │ │ │   │   │   color=Color('red', ColorType.STANDARD, number=1),      │ │
 │ │ │   │   │   bgcolor=Color(                                         │ │
@@ -88,3 +92,5 @@ __END__
 
 https://rich.readthedocs.io/en/stable/style.html
 https://github.com/Textualize/rich/blob/26152e9cc95eef9c8f363d7bf1dfda426275348d/rich/segment.py#L56
+
+
