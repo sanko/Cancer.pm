@@ -1,6 +1,10 @@
 use v5.36;
 use utf8;
 $|++;
+use lib '../lib';
+use Cancer::Color;
+use Cancer::Emoji;
+use Cancer::Style;
 #
 use Data::Dump;
 #
@@ -151,6 +155,112 @@ package Cancer 0.01 {
 
     sub move_to ( $self, $x, $y ) {
         Cancer::Segment->new( undef, undef, [ Cancer::Segment::CURSOR_MOVE_TO(), $x, $y ] );
+    }
+
+    # Parser
+    sub parse ( $self, $text ) {
+        my @tokens = grep {defined} $text =~ m/
+            (*nlb:\\)?
+            (\[(?:[^\[\]]++|(?1))*\])|(.+?[^\[\]]++)/gmsx;
+        use Data::Dump;
+        ddx @tokens;die;
+
+        my @styles;
+        my @segments =
+        Cancer::Segment->new(
+        '', Cancer::Style->new()
+        #~ , Cancer::Style->new( blink => 1, bold => 1, color => Cancer::Color->new('#339933'), bgcolor => Cancer::Color->new('#0fc') )
+    )
+
+        ;
+        my $temp;
+        for my $token (@tokens) {
+            if ( $token =~ m/^\[\s*(.+?)\s*\]$/ ) {
+                my $one = $1;
+                if (
+                    $one =~ m[^/]
+
+                    #~ || ( @styles && $one eq '/' . $styles[-1] )
+                ) {
+                    #~ $styles[-1]
+                    #~ warn 'END: ' . $one;
+                                        push @segments,
+
+                     Cancer::Segment->new(
+        '', Cancer::Style->new()
+        #~ , Cancer::Style->new( blink => 1, bold => 1, color => Cancer::Color->new('#339933'), bgcolor => Cancer::Color->new('#0fc') )
+);
+                }
+                elsif ( my $style = $self->parse_style($one) ) {
+                    push @segments,
+
+ Cancer::Segment->new(
+        '', $style
+        #~ , Cancer::Style->new( blink => 1, bold => 1, color => Cancer::Color->new('#339933'), bgcolor => Cancer::Color->new('#0fc') )
+);
+
+                }
+                else { # Eat unknown tags
+                    #~ warn '-----------------------------> ' . $token;
+                    #~ $segments[-1]->{text} .= $token;
+                }
+            }
+            else {
+                warn "============================= $token";
+                                    $segments[-1]->{text} .= $token;
+            }
+        }
+        @segments;
+    }
+
+    sub parse_style ( $self, $text ) {
+        my $not = 0;
+        my $style =  Cancer::Style->new(
+        );
+
+        #~ Cancer::Style->new( blink => 1, bold => 1, color => Cancer::Color->new('#339933'), bgcolor => Cancer::Color->new('#0fc') )
+
+        CORE::state $styles //= {
+
+            #~ color      => sub {...},
+            #~ bgcolor    => sub {...},
+            bold       => sub { $style->{bold} = !$not },
+            dim        => sub {...},
+            italic     => sub { $style->{italic} = !$not },
+            underline  => sub {...},
+            blink      => sub {...},
+            blink2     => sub {...},
+            reverse    => sub {...},
+            conceal    => sub {...},
+            strike     => sub {...},
+            underline2 => sub {...},
+            frame      => sub {...},
+            encircle   => sub {...},
+            overline   => sub {...},
+            link       => sub {...},
+            not        => sub { $not = 1 }
+        };
+
+
+        my @tokens = split m/\s+/, $text;
+        while ( my $flag = shift @tokens ) {
+            #~ warn $flag;
+            if ( $flag eq 'on' ) {
+                $style->{bgcolor} = Cancer::Color->new(shift @tokens);
+            }
+            elsif ( defined $styles->{$flag} ) {
+                $styles->{$flag}->();
+            }
+            elsif ( my ($color) = grep {defined} Cancer::Color::locate($flag) ) {
+                $style->{color} = Cancer::Color->new($color );
+            }
+            else {
+
+                #~ Carp::carp 'unknown style: ' . $flag;
+                return ();
+            }
+        }
+        return $style;
     }
 
     # Render system
@@ -313,87 +423,6 @@ package Cancer::Segment 0.5 {
 
     sub new ( $class, $text, $style = Cancer::Style->new(), $control = [OUTPUT] ) {
         bless { text => $text, style => $style, control => $control }, $class;
-    }
-}
-
-package Cancer::Style 0.5 {
-    use v5.36;
-
-    # color     Color
-    # bgcolor   Color
-    # bold      bool
-    # italic    bool
-    # blink     bool
-    # blink2    bool
-    sub new ( $class, %args ) {
-        bless \%args, $class;
-    }
-
-    sub open ($self) {
-        my $ret = '';
-        $ret .= Cancer::Terminal::bold()                          if $self->{bold};
-        $ret .= Cancer::Terminal::italic()                        if $self->{italic};
-        $ret .= Cancer::Terminal::slow_blink()                    if $self->{blink};
-        $ret .= Cancer::Terminal::fast_blink()                    if $self->{blink2};
-        $ret .= Cancer::Terminal::bg_rgb( $self->{bgcolor}->rgb ) if $self->{bgcolor} && $self->{bgcolor}->{type} == Cancer::ColorSystem::TRUECOLOR();
-        $ret .= Cancer::Terminal::fg_rgb( $self->{color}->rgb )   if $self->{color}   && $self->{color}->{type} == Cancer::ColorSystem::TRUECOLOR();
-        $ret;
-    }
-
-    sub close ($self) {
-        my $ret = '';
-        $ret .= Cancer::Terminal::bg_reset()        if $self->{bgcolor};
-        $ret .= Cancer::Terminal::fg_reset()        if $self->{color};
-        $ret .= Cancer::Terminal::disable_blink()   if $self->{blink2} || $self->{blink};
-        $ret .= Cancer::Terminal::normal_emphasis() if $self->{italic};
-        $ret .= Cancer::Terminal::normal_weight()   if $self->{bold};
-        $ret;
-    }
-}
-
-#~ sub reset ()            { SGR 0 }
-#~ sub bold()              { SGR 1 }
-#~ sub dim()               { SGR 2 }
-#~ sub italic()            { SGR 3 }
-#~ sub underline()         { SGR 4 }
-#~ sub slow_blink()        { SGR 5 }
-#~ sub fast_blink()        { SGR 6 }
-#~ sub invert ()           { SGR 7 }
-#~ sub hide()              { SGR 8 }
-#~ sub strike()            { SGR 9 }
-#~ sub default_font()      { SGR 10 }
-#~ sub alternate_font ($n) { Carp::confess 'Alternate font should be between 1 and 9' unless 1 <= $n <= 9; SGR 10 + $n }
-#~ sub gothic ()           { SGR 20 }
-#~ sub double_underline()  { SGR 21 }
-#~ sub normal_weight()     { SGR 22 }                                                                                      # disables bold and dim
-#~ sub normal_emphasis()   { SGR 23 }                                                                                      # disables italic
-#~ sub disable_underline() { SGR 24 }    # disables underline and double_underline
-#~ sub disable_blink()     { SGR 25 }    # disables slow and fast blink
-#~ sub disable_invert()    { SGR 27 }
-#~ sub disable_hide()      { SGR 28 }
-#~ sub disable_strike()    { SGR 29 }
-package Cancer::Color {
-    use v5.36;
-
-    sub new ( $class, $color ) {
-
-        #~ $color = Cancer::ColorTriplet->new( hex $+{r} . $+{r}, hex $+{g} . $+{g}, hex $+{b} . $+{b} )
-        #~ if $color =~ m/^#(?'r'[[:xdigit:]])(?'g'[[:xdigit:]])(?'b'[[:xdigit:]])$/;
-        bless {
-            raw => $color, (
-                $color =~ m/^#?(?'r'[[:xdigit:]]{2})(?'g'[[:xdigit:]]{2})(?'b'[[:xdigit:]]{2})$/ ?
-                    ( type => Cancer::ColorSystem::TRUECOLOR(), triplet => Cancer::ColorTriplet->new( hex $+{r}, hex $+{g}, hex $+{b} ) ) : ()
-            ), (
-                $color =~ m/^#?(?'r'[[:xdigit:]])(?'g'[[:xdigit:]])(?'b'[[:xdigit:]])$/ ? (
-                    type    => Cancer::ColorSystem::TRUECOLOR(),
-                    triplet => Cancer::ColorTriplet->new( hex $+{r} . $+{r}, hex $+{g} . $+{g}, hex $+{b} . $+{b} )
-                ) : ()
-            )
-        }, $class;
-    }
-
-    sub rgb ($self) {
-        ( $self->{triplet}{red}, $self->{triplet}{green}, $self->{triplet}{blue} )
     }
 }
 
