@@ -5,7 +5,7 @@ from rich.color import Color
 
 console = Console(color_system="truecolor")
 
-text = "[red] red [uu]f[black]o[/]o[/uu]"
+text = "[red] red [uu]f[black]o[/]o:smile:[/uu]"
 
 fragments = list(console.render(text))
 
@@ -16,4 +16,4 @@ print(text)
 
 inspect(console)
 
-inspect(console.move_to(20, 20))
+#~ inspect(console.move_to(20, 20))

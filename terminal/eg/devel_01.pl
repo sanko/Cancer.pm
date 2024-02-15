@@ -66,7 +66,7 @@ my $list = [
     $cancer->move_to( 5, 5 ),
     $cancer->bell,
     Cancer::Segment->new(
-        "hi " . "🏴\0e0067\0e0062\0e0065\0e006e\0e0067\0e007f",
+        "hi " . ":smile: 😄",
         , Cancer::Style->new( blink => 1, bold => 1, color => Cancer::Color->new('#339933'), bgcolor => Cancer::Color->new('#0fc') )
     ),
     $cancer->newline(3),
