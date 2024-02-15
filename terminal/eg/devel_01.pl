@@ -6,6 +6,52 @@ use Data::Dump;
 #
 $|++;
 #
+my $text = "[bold green on red]This text.[/bold green on red]between
+
+tags [italic]More text.[/][Test]Last bit of text[bold]Bold[/bold]";
+my $regex = qr[
+(?:
+    (?:
+        \[([^\]]+)\]
+            (.+?)
+        \[\/\1?\]
+    )
+    |
+    ([^\[[^\]]+\]]*?)
+)
+]x;
+my @tags;
+$regex = qr/
+                (?:(?:                   # start of bracket 1
+                \[                   # match an opening angle bracket
+                    (?:
+                        (?'tag'[^\[\]]++)     # one or more non angle brackets, non backtracking
+                          |
+                        (?1)        # recurse to bracket 1
+                    )*
+                \]                   # match a closing angle bracket
+                )                   # end of bracket 1
+                |(?'text'[^\[\]]++)
+                )
+                /x;
+
+while ( $text =~ /$regex/g ) {
+    warn 'Plain: ' . $+{text} if defined $+{text};
+    if ( defined $+{tag} ) {
+        my $tag = $+{tag};
+        if ( $tag =~ m[^/] ) {
+            pop @tags if ( !@tags || $tags[-1] eq $tag );
+        }
+        else { push @tags, $tag }
+        warn 'Tag:   ' . $tag;
+    }
+
+    #~ my ( $tag, $attr1, $attr2, $content, $etc ) = ( $1, $2, $3, $4, $5 );
+    #~ ddx [ $tag, $attr1, $attr2, $content, $etc ];
+}
+ddx \@tags;
+die;
+#
 my $cancer = Cancer->new(
     color_system => 256,
     encoding     => 'utf-8',
