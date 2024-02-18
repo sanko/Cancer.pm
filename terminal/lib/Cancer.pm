@@ -104,7 +104,7 @@ package Cancer 0.01 {
             max_height     => $args{max_height} // $args{height},
             width          => $args{width},
             height         => $args{height},
-            is_terminal    => $args{is_terminal} // !!-t $args{stdin},
+            is_terminal    => $args{is_terminal} // !!-t $args{fh_in},
             encoding       => $args{encoding}    // 'utf-8',
             justify        => $args{justify}     // undef,
             overlow        => $args{overlow}     // undef,
