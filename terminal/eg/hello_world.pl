@@ -4,7 +4,7 @@ use Data::Dump;
 use lib '../lib';
 #
 use Cancer;
-use Cancer::terminfo::xterm::256color;
+#~ use Cancer::terminfo::xterm::256color;
 #
 my $term = Cancer->new;
 ddx $term->get_win_size;

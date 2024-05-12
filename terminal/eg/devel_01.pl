@@ -7,12 +7,12 @@ use v5.36;
 #
 $|++;
 #
-
 #
 my $cancer = Cancer->new(
     color_system => 256,
     encoding     => 'utf-8',
-    is_terminal  => 1,
+
+    #~ is_terminal  => 1,
     color_system => Cancer::ColorSystem::TRUECOLOR(),
 
     #~ size =>
@@ -66,21 +66,21 @@ my $cancer = Cancer->new(
 =cut
 
 my $list = [
-    $cancer->move_to( 5, 5 ),
-    $cancer->bell,
+    Cancer::move_to( 5, 5 ),
+    Cancer::bell,
     Cancer::Segment->new(
-        "hi " . ":smile: 😄",
-        , Cancer::Style->new( blink => 1, bold => 1, color => Cancer::Color->new('#339933'), bgcolor => Cancer::Color->new('#0fc') )
+      text=>  "hi " . ":smile: 😄",
+        ,style => Cancer::Style->new( blink => 1, bold => 1, color => Cancer::Color->new(color=>'#339933'), bgcolor => Cancer::Color->new(color=>'#0fc') )
     ),
-    $cancer->newline(3),
-    Cancer::Segment->new( 'hi', Cancer::Style->new( italic => 1 ) ),
-    $cancer->newline
+    Cancer::newline(3),
+    Cancer::Segment->new( text =>'hi', style=> Cancer::Style->new( italic => 1 ) ),
+    Cancer::newline
 ];
-ddx $list;
+#~ ddx $list;
 print $cancer->render($list);
-my %hash;
-CORE::say sprintf '%s() {"%s"}', $_, $hash{$_} for sort keys %hash;
-ddx \%hash;
+#~ my %hash;
+#~ CORE::say sprintf '%s() {"%s"}', $_, $hash{$_} for sort keys %hash;
+#~ ddx \%hash;
 __END__
 │ │ │   │   │   color=Color('red', ColorType.STANDARD, number=1),      │ │
 │ │ │   │   │   bgcolor=Color(                                         │ │

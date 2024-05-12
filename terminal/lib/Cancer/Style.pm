@@ -13,17 +13,19 @@ package Cancer::Style 0.5 {
 
     sub open ($self) {
         my $ret = '';
-        $ret .= Cancer::Terminal::bold()                          if $self->{bold};
-        $ret .= Cancer::Terminal::italic()                        if $self->{italic};
-        $ret .= Cancer::Terminal::slow_blink()                    if $self->{blink};
-        $ret .= Cancer::Terminal::fast_blink()                    if $self->{blink2};
-        #~ $ret .= Cancer::Terminal::bg_rgb( $self->{bgcolor}->rgb ) if $self->{bgcolor} && $self->{bgcolor}->{type} == Cancer::ColorSystem::TRUECOLOR();
-        #~ $ret .= Cancer::Terminal::fg_rgb( $self->{color}->rgb )   if $self->{color}   && $self->{color}->{type} == Cancer::ColorSystem::TRUECOLOR();
+        $ret .= Cancer::Terminal::bold()       if $self->{bold};
+        $ret .= Cancer::Terminal::italic()     if $self->{italic};
+        $ret .= Cancer::Terminal::slow_blink() if $self->{blink};
+        $ret .= Cancer::Terminal::fast_blink() if $self->{blink2};
+
+     #~ $ret .= Cancer::Terminal::bg_rgb( $self->{bgcolor}->rgb ) if $self->{bgcolor} && $self->{bgcolor}->{type} == Cancer::ColorSystem::TRUECOLOR();
+     #~ $ret .= Cancer::Terminal::fg_rgb( $self->{color}->rgb )   if $self->{color}   && $self->{color}->{type} == Cancer::ColorSystem::TRUECOLOR();
         $ret;
     }
 
     sub close ($self) {
         my $ret = '';
+
         #~ $ret .= Cancer::Terminal::bg_reset()        if $self->{bgcolor};
         #~ $ret .= Cancer::Terminal::fg_reset()        if $self->{color};
         $ret .= Cancer::Terminal::disable_blink()   if $self->{blink2} || $self->{blink};
@@ -54,5 +56,4 @@ package Cancer::Style 0.5 {
 #~ sub disable_invert()    { SGR 27 }
 #~ sub disable_hide()      { SGR 28 }
 #~ sub disable_strike()    { SGR 29 }
-
 1;

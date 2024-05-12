@@ -1,4 +1,6 @@
-use v5.36;
+use v5.38;
+use feature 'class';
+no warnings 'experimental::class', 'experimental::builtin';
 use utf8;
 $|++;
 use lib '../lib';
@@ -8,24 +10,23 @@ use Cancer::Style;
 #
 use Data::Dump;
 #
-package Cancer::Log 0.5 {
-    use v5.36;
+class Cancer::Log 0.5 {
     use Path::Tiny;
-    sub new      ( $class, $level ) { }
-    sub is_info  ($self)            { }
-    sub is_debug ($self)            { }
-    sub context() { }
+    field $level : param;
+    method is_info ()  { }
+    method is_debug () { }
+    method context()   { }
     #
-    sub error ( $self, $msg ) { }
+    method error ($msg) { }
     #
-    sub warn    ( $self, $msg ) { }
-    sub warning ( $self, $msg ) { }
+    method warn    ($msg) { }
+    method warning ($msg) { }
     #
-    sub info ( $self, $msg ) { }
+    method info ($msg) { }
     #
-    sub errorf ( $self, $msg, @fields ) { }
-    sub debugf ( $self, $msg, @fields ) { }
-}
+    method errorf ( $msg, @fields ) { }
+    method debugf ( $msg, @fields ) { }
+};
 
 package Devel::Cancer 0.5 {
     use v5.36;
@@ -71,8 +72,47 @@ package Cancer::ColorSystem {
     use constant { EIGHT_BIT => dualvar( 0, 'EIGHT_BIT' ), STANDARD => dualvar( 1, 'STANDARD' ), TRUECOLOR => dualvar( 2, 'TRUECOLOR' ) };
 }
 #
-package Cancer 0.01 {
-    use v5.36;
+class Cancer 0.01 {
+    field $fh_out : param //= \*STDOUT;
+    field $fh_in : param  //= \*STDIN;
+    field $is_terminal = !!-t $fh_out;
+
+    # Layout
+    field $encoding : param //= 'utf-8';
+    field $justify : param  //= !1;
+    field $overflow : param //= !1;
+    field $wrap : param     //= !1;
+    field $highlight : param = !1;
+    field $markup : param    = !1;
+    field $emoji_variant : param //= 'emoji';    # Or text
+
+    #
+    field $color_system : param //= Cancer::ColorSystem::STANDARD();
+
+    # Metrics
+    field $x : param = 0;
+    field $y : param = 0;
+    field $width : param //= sub {
+        _get_terminal_dimensions($fh_out)->[0]    # TODO: 80 if DUMB terminal
+    };
+    field $height : param //= sub {
+        _get_terminal_dimensions($fh_out)->[1]    # TODO: 25 if DUMB terminal
+    };
+    field $min_width : param  //= $width;
+    field $min_height : param //= $height;
+    field $max_width : param  //= $width;
+    field $max_height : param //= $height;
+    #
+    field $cache_o = '';
+    field $cache_i = '';
+    #
+    field $renderer : param       //= 'Cancer::Renderer::Live';
+    field $legacy_windows : param //= !1;                         # TODO: detect old skool cmd
+
+    #
+    ADJUST {
+        $renderer = $renderer->new() unless builtin::blessed $renderer;
+    }
     my $TermColors
         = { kitty => Cancer::ColorSystem::EIGHT_BIT(), '256color' => Cancer::ColorSystem::EIGHT_BIT(), '16color' => Cancer::ColorSystem::STANDARD() };
 
@@ -80,45 +120,8 @@ package Cancer 0.01 {
         ...;
     }
 
-    sub new ( $class, %args ) {
-        $args{fh_out} //= \*STDOUT;
-        $args{fh_in}  //= \*STDIN;
-        if ( $args{terminal_type} // '' eq 'DUMB' ) {
-            $args{width}  //= 80;
-            $args{height} //= 25;
-        }
-        elsif ( !defined $args{width} || !defined $args{height} ) {
-            my ( $w, $h ) = _get_terminal_dimensions( $args{fh_out} );
-            $args{width}  //= $w;
-            $args{height} //= $h;
-        }
-        #
-        bless {
-            fh_out         => $args{fh_out},
-            fh_in          => $args{fh_in},
-            size           => [ $args{width}, $args{height} ],
-            legacy_windows => !1,                                # TODO: detect old skool cmd
-            min_width      => $args{min_width}  // $args{width},
-            min_height     => $args{min_height} // $args{height},
-            max_width      => $args{max_width}  // $args{width},
-            max_height     => $args{max_height} // $args{height},
-            width          => $args{width},
-            height         => $args{height},
-            is_terminal    => $args{is_terminal} // !!-t $args{fh_in},
-            encoding       => $args{encoding}    // 'utf-8',
-            justify        => $args{justify}     // undef,
-            overlow        => $args{overlow}     // undef,
-            no_wrap        => $args{no_wrap}     // !1,
-            highlight      => $args{highlight}   // undef,
-            markup         => $args{markup}      // undef,
-            emoji_variant  => $args{emoji_variant} //= 'emoji',
-            x              => 0,
-            y              => 0,
-            cache_out      => '',
-            cache_in       => '',
-            renderer       => $args{renderer} // 'Cancer::Renderer::Live'
-        }, $class;
-    }
+=cut
+
     #
     sub ascii_only ($self) {
         return $self->{encoding} !~ m[^utf]i;
@@ -144,35 +147,37 @@ package Cancer 0.01 {
         ( $self->{width}, $self->{height} );
     }
 
+=cut
+
     # Output
-    sub newline ( $self, $count = 1 ) {
-        Cancer::Segment->new( "\n" x $count );
+    sub newline ( $count = 1 ) {
+        Cancer::Segment->new( text => "\n" x $count );
     }
 
-    sub bell ($self) {
-        Cancer::Segment->new( undef, undef, [ Cancer::Segment::BELL() ] );
+    sub bell () {
+        Cancer::Segment->new( control => [ Cancer::Segment::BELL() ] );
     }
 
-    sub move_to ( $self, $x, $y ) {
-        Cancer::Segment->new( undef, undef, [ Cancer::Segment::CURSOR_MOVE_TO(), $x, $y ] );
+    sub move_to ( $x, $y ) {
+        Cancer::Segment->new( control => [ Cancer::Segment::CURSOR_MOVE_TO(), $x, $y ] );
     }
 
+=cut
     # Parser
     sub parse ( $self, $text ) {
         my @tokens = grep {defined} $text =~ m/
             (*nlb:\\)?
             (\[(?:[^\[\]]++|(?1))*\])|(.+?[^\[\]]++)/gmsx;
         use Data::Dump;
-        ddx @tokens;die;
-
+        ddx @tokens;
+        die;
         my @styles;
-        my @segments =
-        Cancer::Segment->new(
-        '', Cancer::Style->new()
-        #~ , Cancer::Style->new( blink => 1, bold => 1, color => Cancer::Color->new('#339933'), bgcolor => Cancer::Color->new('#0fc') )
-    )
+        my @segments = Cancer::Segment->new(
+            '',
+            Cancer::Style->new()
 
-        ;
+            #~ , Cancer::Style->new( blink => 1, bold => 1, color => Cancer::Color->new('#339933'), bgcolor => Cancer::Color->new('#0fc') )
+        );
         my $temp;
         for my $token (@tokens) {
             if ( $token =~ m/^\[\s*(.+?)\s*\]$/ ) {
@@ -184,42 +189,39 @@ package Cancer 0.01 {
                 ) {
                     #~ $styles[-1]
                     #~ warn 'END: ' . $one;
-                                        push @segments,
+                    push @segments, Cancer::Segment->new(
+                        '',
+                        Cancer::Style->new()
 
-                     Cancer::Segment->new(
-        '', Cancer::Style->new()
-        #~ , Cancer::Style->new( blink => 1, bold => 1, color => Cancer::Color->new('#339933'), bgcolor => Cancer::Color->new('#0fc') )
-);
+                       #~ , Cancer::Style->new( blink => 1, bold => 1, color => Cancer::Color->new('#339933'), bgcolor => Cancer::Color->new('#0fc') )
+                    );
                 }
                 elsif ( my $style = $self->parse_style($one) ) {
-                    push @segments,
+                    push @segments, Cancer::Segment->new(
+                        '', $style
 
- Cancer::Segment->new(
-        '', $style
-        #~ , Cancer::Style->new( blink => 1, bold => 1, color => Cancer::Color->new('#339933'), bgcolor => Cancer::Color->new('#0fc') )
-);
-
+                       #~ , Cancer::Style->new( blink => 1, bold => 1, color => Cancer::Color->new('#339933'), bgcolor => Cancer::Color->new('#0fc') )
+                    );
                 }
-                else { # Eat unknown tags
+                else {    # Eat unknown tags
+
                     #~ warn '-----------------------------> ' . $token;
                     #~ $segments[-1]->{text} .= $token;
                 }
             }
             else {
                 warn "============================= $token";
-                                    $segments[-1]->{text} .= $token;
+                $segments[-1]->{text} .= $token;
             }
         }
         @segments;
     }
 
     sub parse_style ( $self, $text ) {
-        my $not = 0;
-        my $style =  Cancer::Style->new(
-        );
+        my $not   = 0;
+        my $style = Cancer::Style->new();
 
         #~ Cancer::Style->new( blink => 1, bold => 1, color => Cancer::Color->new('#339933'), bgcolor => Cancer::Color->new('#0fc') )
-
         CORE::state $styles //= {
 
             #~ color      => sub {...},
@@ -240,43 +242,37 @@ package Cancer 0.01 {
             link       => sub {...},
             not        => sub { $not = 1 }
         };
-
-
         my @tokens = split m/\s+/, $text;
         while ( my $flag = shift @tokens ) {
+
             #~ warn $flag;
             if ( $flag eq 'on' ) {
-                $style->{bgcolor} = Cancer::Color->new(shift @tokens);
+                $style->{bgcolor} = Cancer::Color->new( shift @tokens );
             }
             elsif ( defined $styles->{$flag} ) {
                 $styles->{$flag}->();
             }
             elsif ( my ($color) = grep {defined} Cancer::Color::locate($flag) ) {
-                $style->{color} = Cancer::Color->new($color );
+                $style->{color} = Cancer::Color->new($color);
             }
             else {
-
                 #~ Carp::carp 'unknown style: ' . $flag;
                 return ();
             }
         }
         return $style;
     }
+=cut
 
     # Render system
-    sub render ( $self, $lines, $x = (), $y = () ) {
+    method render ( $lines, $_x = (), $_y = () ) {
         if ( defined $x && defined $y ) {
-            $self->{x} = $x;
-            $self->{y} = $y;
-            unshift @$lines, $self->move_to( $x, $y );
+            unshift @$lines, move_to( $_x, $_y );
         }
-        else {
-            $x = $self->{x};
-            $y = $self->{y};
-        }
-        $self->{renderer}->render(@$lines);
+        $renderer->render(@$lines);
     }
 
+=cut
     sub write ( $self, $data //= () ) {
         $self->{cache_out} .= $data if defined $data;
         return                      if !length $self->{cache_out};
@@ -296,6 +292,29 @@ package Cancer 0.01 {
         sysread $self->{fh_in}, my ($ret), $length;
         return $ret;
     }
+    method read_line() {
+            $self->write( $prompt);
+            scalar readline $self->{fh_in};
+            #~ warn +readline $i;
+        }
+
+        method read_password() {
+            my $t1 = is_terminal($i);    # 2nd copy that we can modify
+            my $t2 = is_terminal($i);    # 2nd copy that we can modify
+
+            # Taken from Go's term/term_unix.go
+            $t2->setiflag( $t2->getiflag() | (ICRNL) );
+            $t2->setlflag( $t2->getlflag() | ( ICANON | ISIG ) ^ ECHO );
+            $t2->setcc( VMIN,  1 );
+            $t2->setcc( VTIME, 0 );
+                        print $o $prompt;
+            $t2->setattr( fileno $o, TCSANOW ) ? 1 : return Cancer::Term::Error->new( message => 'Failed to set password state' );
+            my $bytes =
+                        scalar readline $i;
+
+            $t1->setattr( fileno $o, TCSANOW ) ? 1 : return Cancer::Term::Error->new( message => 'Failed to reset state' );
+            return $bytes;
+        }
     #
     sub _TIOCGWINSZ () {    # See Perl::osnames
         return 0x800c     if $^O =~ qr/\A(?:beos)\z/;
@@ -304,17 +323,18 @@ package Cancer 0.01 {
         return 0x5413       # Linux and android
     }
 
-    sub _get_terminal_dimensions ($fh) {
+    method _get_terminal_dimensions() {
         my $winsize = "\0" x 8;
-        ( ( ioctl( $fh, _TIOCGWINSZ(), $winsize ) ) ? ( unpack 'S4', $winsize ) : ( map { $_ * 0 } ( 1 .. 4 ) ) );
+        ( ( ioctl( $fh_in, _TIOCGWINSZ(), $winsize ) ) ? ( unpack 'S4', $winsize ) : ( map { $_ * 0 } ( 1 .. 4 ) ) );
     }
-}
+=cut
 
-package Cancer::Renderer::Live 0.5 {
+    }
 
-    sub render ( $etc, @segments ) {
+    class Cancer::Renderer::Live 0.5 {
+    method render ( $etc, @segments ) {
         CORE::state $c //= {
-            BELL => sub ($s) {
+            BELL => sub($s) {
                 Cancer::Terminal::BEL();
             },
             CARRIAGE_RETURN => sub ($s) {
@@ -378,7 +398,7 @@ package Cancer::Renderer::Live 0.5 {
                 ...;
             },
             CURSOR_MOVE_TO => sub ($s) {
-                Cancer::Terminal::CUP( $s->{control}->[ 1, 2 ] );
+                Cancer::Terminal::CUP( $s->control->[ 1, 2 ] );
             },
             ERASE_IN_LINE => sub ($s) {
                 use Data::Dump;
@@ -391,15 +411,13 @@ package Cancer::Renderer::Live 0.5 {
                 ...;
             },
             OUTPUT => sub ($s) {
-                return $s->{style}->open() . $s->{text} . $s->{style}->close();
-            },
+                return $s->style->open() . $s->text . $s->style->close();
+            }
         };
-        join '', map { $c->{ $_->{control}[0] }->($_) } @segments;
+        join '', map { $c->{ $_->control->[0] }->($_) } @segments;
     }
-}
-
-package Cancer::Segment 0.5 {
-    use v5.36;
+    };
+class Cancer::Segment 0.5 {
     use Scalar::Util qw[dualvar];
     use constant {
         BELL                  => dualvar( 1,  'BELL' ),
@@ -420,18 +438,20 @@ package Cancer::Segment 0.5 {
         SET_WINDOW_TITLE      => dualvar( 16, 'SET_WINDOW_TITLE' ),
         OUTPUT                => dualvar( 17, 'OUTPUT' )
     };
+    field $text : param    //= ();
+    field $style : param   //= Cancer::Style->new();
+    field $control : param //= [OUTPUT];
 
-    sub new ( $class, $text, $style = Cancer::Style->new(), $control = [OUTPUT] ) {
-        bless { text => $text, style => $style, control => $control }, $class;
-    }
-}
+    # waiting for 5.40
+    method text()    {$text}
+    method style()   {$style}
+    method control() {$control}
+};
 
-package Cancer::ColorTriplet {
-    use v5.36;
-
-    sub new ( $class, $red, $green, $blue ) {
-        bless { red => $red, green => $green, blue => $blue }, $class;
-    }
+class Cancer::ColorTriplet {
+    field $red : param;
+    field $green : param;
+    field $blue : param;
 }
 
 package Cancer::Terminal {

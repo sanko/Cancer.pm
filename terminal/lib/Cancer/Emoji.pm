@@ -4120,7 +4120,7 @@ package Cancer::Emoji 15.10 {
         "zombie"                                                           => "\x{1F9DF}",
         "zzz"                                                              => "\x{1F4A4}",
     };
-    sub locate ($name) { $emoji->{$name} // () }
+    sub locate($name) { $emoji->{$name} // () }
 }
 1;
 __END__

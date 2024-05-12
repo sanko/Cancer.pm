@@ -1,29 +1,26 @@
-package Cancer::Color {
-    use v5.36;
+use v5.38;
+use feature 'class';
+no warnings 'experimental::class', 'experimental::builtin';
+class Cancer::Color {
     use lib '../../lib';
     use Cancer::Style;
-
-    sub new ( $class, $color ) {
-
-        #~ $color = Cancer::ColorTriplet->new( hex $+{r} . $+{r}, hex $+{g} . $+{g}, hex $+{b} . $+{b} )
-        #~ if $color =~ m/^#(?'r'[[:xdigit:]])(?'g'[[:xdigit:]])(?'b'[[:xdigit:]])$/;
-        bless {
-            raw => $color, (
-                $color =~ m/^#?(?'r'[[:xdigit:]]{2})(?'g'[[:xdigit:]]{2})(?'b'[[:xdigit:]]{2})$/ ?
-                    ( type => Cancer::ColorSystem::TRUECOLOR(), triplet => Cancer::ColorTriplet->new( hex $+{r}, hex $+{g}, hex $+{b} ) ) : ()
-            ), (
-                $color =~ m/^#?(?'r'[[:xdigit:]])(?'g'[[:xdigit:]])(?'b'[[:xdigit:]])$/ ? (
-                    type    => Cancer::ColorSystem::TRUECOLOR(),
-                    triplet => Cancer::ColorTriplet->new( hex $+{r} . $+{r}, hex $+{g} . $+{g}, hex $+{b} . $+{b} )
-                ) : ()
-            )
-        }, $class;
+    field $color : param;
+    field $type;
+    field $triplet;
+    ADJUST {
+        if ( $color =~ m/^#?(?'red'[[:xdigit:]]{2})(?'green'[[:xdigit:]]{2})(?'blue'[[:xdigit:]]{2})$/ ) {
+            $type    = Cancer::ColorSystem::TRUECOLOR();
+            $triplet = Cancer::ColorTriplet->new( red=>hex $+{red}, green=>hex $+{green} , blue=> hex $+{blue} );
+        }
+        elsif ( $color =~ m/^#?(?'red'[[:xdigit:]])(?'green'[[:xdigit:]])(?'blue'[[:xdigit:]])$/ ) {
+            $type    = Cancer::ColorSystem::TRUECOLOR();
+            $triplet = Cancer::ColorTriplet->new( red=>hex $+{red} . $+{red}, green=>hex $+{green} . $+{green}, blue=> hex $+{blue} . $+{blue} );
+        }
+        else {
+            ...;
+        }
     }
-
-    sub rgb ($self) {
-        ( $self->{triplet}{red}, $self->{triplet}{green}, $self->{triplet}{blue} )
-    }
-
+    method rgb () {$triplet}
     my $ansi_colors = {
         black               => 0,
         red                 => 1,
@@ -261,6 +258,6 @@ package Cancer::Color {
         grey93              => 255,
         gray93              => 255
     };
-
-        sub locate ($name) { $ansi_colors->{$name} // () }
+    #
+    sub locate ($name) { $ansi_colors->{$name} // () }
 }
