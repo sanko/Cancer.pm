@@ -69,15 +69,23 @@ my $list = [
     Cancer::move_to( 5, 5 ),
     Cancer::bell,
     Cancer::Segment->new(
-      text=>  "hi " . ":smile: 😄",
-        ,style => Cancer::Style->new( blink => 1, bold => 1, color => Cancer::Color->new(color=>'#339933'), bgcolor => Cancer::Color->new(color=>'#0fc') )
+        text => "hi " . ":smile: 😄 " . $cancer->width() . 'x' . $cancer->height,
+        ,
+        style => Cancer::Style->new(
+            blink   => 1,
+            bold    => 1,
+            color   => Cancer::Color->new( color => '#339933' ),
+            bgcolor => Cancer::Color->new( color => '#0fc' )
+        )
     ),
     Cancer::newline(3),
-    Cancer::Segment->new( text =>'hi', style=> Cancer::Style->new( italic => 1 ) ),
+    Cancer::Segment->new( text => 'hi', style => Cancer::Style->new( italic => 1 ) ),
     Cancer::newline
 ];
+
 #~ ddx $list;
 print $cancer->render($list);
+
 #~ my %hash;
 #~ CORE::say sprintf '%s() {"%s"}', $_, $hash{$_} for sort keys %hash;
 #~ ddx \%hash;
