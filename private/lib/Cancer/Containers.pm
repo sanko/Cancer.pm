@@ -93,7 +93,6 @@ package Cancer::Containers {
     };
 }
 1;
-1;
 __END__
 =encoding utf-8
 

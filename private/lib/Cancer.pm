@@ -5,47 +5,8 @@ use diagnostics;
 no warnings 'experimental::class';
 use lib '../lib';
 #
-package Cancer::Console {
-
-    class Cancer::ConsoleDimensions {
-        field $width : param : reader;
-        field $height : param : reader;
-    }
-
-    class Cancer::ConsoleOptions { }
-
-    class Cancer::Console {
-        field $style = Cancer::Style->new();    # PLACEHOLDER!!!!!!!!!!!!!!!!!!!!!!!
-
-        method get_style( $name, $default //= () ) {
-        }
-    }
-
-    class Cancer::Console::Win32 { }
-    #
-    class Cancer::RichCast { }
-
-    class Cancer::ConsoleRenderable { }
-
-    class Cancer::NewLine { }
-
-    class Cancer::ScreenUpdate { }
-
-    class Cancer::Console::Capture { }
-
-    class Cancer::ThemeContext { }
-
-    class Cancer::PagerContext { }
-
-    class Cancer::ScreenContext { }
-
-    class Cancer::Group { }
-}
-;
-
-
 class Cancer {
-    field $_color_system
+    field $_color_system : param
 
     #~ {'_color_system': ColorSystem.WINDOWS,
     #~ '_emoji': True,

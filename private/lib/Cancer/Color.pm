@@ -309,15 +309,14 @@ package Cancer::Color {
         use overload '""' => sub ( $s, $etc ) {
             Cancer::Text->assemble(
                 '<color %s (%s)%s>', $s->name, lc $s->type->name,
-
-                #~ ('⬤', Style(color=self)) # This is supposed to be a dot the color of this object
-                ''
+                ( '⬤', Cancer::Style->new( color => $s ) )    # This is supposed to be a dot the color of this object
             );
         };
         field $name : param : reader;
         field $type : param : reader;
         field $number : param  //= ();
-        field $triplet : param //= ();
+        field $triplet : param //= ();    # Cancer::Color::Triplet
+
         #
         method _data_printer($ddp) {
             "$self";
