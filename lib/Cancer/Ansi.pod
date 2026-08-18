@@ -1,0 +1,554 @@
+=head1 NAME
+
+Cancer::Ansi - Build raw ANSI/VT escape sequences for terminal control
+
+=head1 SYNOPSIS
+
+    use Cancer::Ansi qw(
+        set_window_title set_clipboard ShowCursor
+        set_mode reset_mode ModeAltScreen
+        SelectGraphicRendition AttrBold
+        set_foreground_color convert_256
+    );
+
+    print set_window_title('My App');            # \e]2;My App\a
+    print set_system_clipboard('copied');        # \e]52;c;Y29waWVk\a
+    print ShowCursor;                            # \e[?25h
+    print set_mode( ModeAltScreen, ModeMouseNormal );
+    print SelectGraphicRendition( AttrBold, 31 );    # \e[1;31m
+    print set_foreground_color( convert_256( 0xFF8C00 ) );
+
+=head1 DESCRIPTION
+
+B<Cancer::Ansi> is a function-oriented helper module for the Cancer TUI framework that returns I<raw> ANSI/VT escape
+sequences. It is the low-level "sequence builder" that every higher layer (L<Cancer::Screen>, L<Cancer::Renderer>,
+L<Cancer::Style>) uses to talk to a terminal. Nothing here talks to a terminal directly; each exported function merely
+returns the byte string that C<write>ing to a terminal (or a L<Cancer::Terminal> implementation) would produce.
+
+Every exported symbol is pulled in explicitly via C<use Cancer::Ansi qw(...)>; nothing is exported by default.
+
+The module mirrors the escape-sequence builders found in Go's terminal ecosystem, most directly
+C<github.com/charmbracelet/x/ansi>, and encodes the same control sequences defined by the ECMA-48 / ANSI X3.64 standard
+and the private DEC, kitty, and xterm extensions.
+
+=head1 COLOR (OSC 10-12)
+
+=head2 set_foreground_color ( $color )
+
+Returns the OSC 10 sequence C<\e]10;$color\a> that sets the terminal's default foreground color. C<$color> is typically
+a hex string like C<#ff8c00>.
+
+=head2 set_background_color ( $color )
+
+Returns C<\e]11;$color\a> to set the default background color.
+
+=head2 set_cursor_color ( $color )
+
+Returns C<\e]12;$color\a> to set the text cursor color.
+
+=head2 request_foreground_color ()
+
+Returns C<\e]10;?\a>; the terminal answers with a color report on the input stream.
+
+=head2 request_background_color ()
+
+Returns C<\e]11;?\a>.
+
+=head2 request_cursor_color ()
+
+Returns C<\e]12;?\a>.
+
+=head2 reset_foreground_color ()
+
+Returns C<\e]110\a> to restore the terminal's default foreground.
+
+=head2 reset_background_color ()
+
+Returns C<\e]111\a>.
+
+=head2 reset_cursor_color ()
+
+Returns C<\e]112\a>.
+
+=head1 CLIPBOARD (OSC 52)
+
+=head2 set_clipboard ( $channel, $data )
+
+Returns the OSC 52 sequence C<\e]52;$channel;$data\a> that writes C<$data> to the clipboard selected by C<$channel>
+(see C<SYSTEM_CLIPBOARD> and C<PRIMARY_CLIPBOARD> below). Non-empty data is base64-encoded with MIME::Base64 before
+being embedded.
+
+=head2 set_system_clipboard ( $data ) / set_primary_clipboard ( $data )
+
+Convenience wrappers that set the system (C<c>) or primary selection (C<p>) clipboard, respectively.
+C<set_system_clipboard> delegates to C<set_clipboard( SYSTEM_CLIPBOARD, $data )>.
+
+=head2 reset_clipboard ( $channel )
+
+Empties the given clipboard channel via C<set_clipboard( $channel, '' )>.
+
+=head2 request_clipboard ( $channel )
+
+Returns C<\e]52;$channel;?\a>, requesting that the terminal paste the current clipboard contents as a response on the
+input stream.
+
+=over 4
+
+=item * C<SYSTEM_CLIPBOARD>
+
+Constant C<'c'> identifying the system (OS) clipboard.
+
+=item * C<PRIMARY_CLIPBOARD>
+
+Constant C<'p'> identifying the X11 primary selection.
+
+=item * C<RESET_SYSTEM_CLIPBOARD>
+
+Pre-built sequence C<\e]52;c;\a> that empties the system clipboard.
+
+=item * C<RESET_PRIMARY_CLIPBOARD>
+
+Pre-built sequence C<\e]52;p;\a> that empties the primary clipboard.
+
+=item * C<REQUEST_SYSTEM_CLIPBOARD>
+
+Pre-built sequence C<\e]52;c;?\a> that requests the system clipboard.
+
+=item * C<REQUEST_PRIMARY_CLIPBOARD>
+
+Pre-built sequence C<\e]52;p;?\a> that requests the primary clipboard.
+
+=back
+
+=head1 HYPERLINKS (OSC 8)
+
+=head2 set_hyperlink ( $uri, @params )
+
+Returns the OSC 8 hyperlink sequence C<\e]8;$params;$uri\a>. C<@params> are extra semicolon-separated parameters (for
+example C<id:foo>) and are only emitted when present.
+
+=head2 reset_hyperlink ( @params )
+
+Clears the active hyperlink by calling C<set_hyperlink( '', @params )>.
+
+=head1 WINDOW TITLE (OSC 0-2)
+
+=head2 set_icon_name_window_title ( $text )
+
+Returns C<\e]0;$text\a> setting both the icon name and window title.
+
+=head2 set_icon_name ( $text )
+
+Returns C<\e]1;$text\a> setting only the icon name.
+
+=head2 set_window_title ( $text )
+
+Returns C<\e]2;$text\a> setting only the window title.
+
+=head2 decswt ( $name )
+
+Returns C<\e]2;1;$name\a>; the DEC conformant (VT420) window title form.
+
+=head2 decsin ( $name )
+
+Returns C<\e]2;L;$name\a>; the DEC conformant session name form.
+
+=head1 WORKING DIRECTORY (OSC 7)
+
+=head2 notify_working_directory ( $host, @paths )
+
+Returns C<\e]7;file://$host/path1/path2\a> which tells the terminal the current working directory so it can offer the
+path in file dialogs or a "open here" action.
+
+=head1 GRAPHICS (kitty)
+
+=head2 kitty_graphics ( $payload, @opts )
+
+Returns a kitty graphics protocol frame C<\e_GE<lt>optsE<gt>;<payload>\e\\>. C<@opts> are comma-joined into the
+protocol's options string (e.g. C<q=2>, C<a=T>); an empty payload omits the terminating semicolon. See L<the kitty
+graphics protocol|https://sw.kovidgoyal.net/kitty/graphics-protocol/>.
+
+=head1 MODES
+
+Terminal modes are represented internally as C<[ number, is_dec ]> pairs: C<is_dec> is true for DEC private modes
+(emitted with a C<?> prefix), false for ANSI modes. The constants below are such pairs; shorthand aliases are listed
+after each full name.
+
+=head2 set_mode ( @modes )
+
+Returns a C<SM> (Set Mode, C<\e[..h>) sequence enabling each given mode. ANSI and DEC modes are batched into their own
+sequences. Returns the empty string when no modes are given.
+
+=head2 reset_mode ( @modes )
+
+Returns an C<RM> (Reset Mode, C<\e[..l>) sequence disabling each given mode.
+
+=head2 request_mode ( $mode )
+
+Returns the DECRQM request sequence C<\e[?N$p> (or C<\e[N$p> for ANSI modes); the terminal replies with a C<\e[?N;M$y>
+report which can be parsed with C<report_mode>.
+
+=head2 report_mode ( $mode, $value )
+
+Returns the DECRPM report sequence C<\e[?N;M$y> for a value in the range 0-4 (values outside the range are clamped to
+C<ModeNotRecognized>). See the mode-state constants below.
+
+=over 4
+
+=item * C<ModeNotRecognized> - 0
+
+=item * C<ModeSet> - 1
+
+=item * C<ModeReset> - 2
+
+=item * C<ModePermanentlySet> - 3
+
+=item * C<ModePermanentlyReset> - 4
+
+=back
+
+=head2 mode_is_not_recognized ( $m ) / mode_is_set ( $m ) / mode_is_reset ( $m ) / mode_is_permanently_set ( $m ) / mode_is_permanently_reset ( $m )
+
+Predicate helpers that answer whether a reported mode state matches a given classification. C<mode_is_set> also accepts
+C<ModePermanentlySet>, and C<mode_is_reset> also accepts C<ModePermanentlyReset>.
+
+=head2 mode_is_dec ( $m )
+
+Returns true if the mode is a DEC private mode (will be emitted with a C<?> prefix).
+
+=head2 mode_num ( $m )
+
+Returns the numeric identifier of the mode.
+
+=head2 ANSI mode constants
+
+=over 4
+
+=item * C<ModeKeyboardAction> / C<KAM> - 2
+
+=item * C<ModeInsertReplace> / C<IRM> - 4
+
+=item * C<ModeBiDirectionalSupport> / C<BDSM> - 8
+
+=item * C<ModeSendReceive> / C<ModeLocalEcho> / C<SRM> - 12
+
+=item * C<ModeLineFeedNewLine> / C<LNM> - 20
+
+=back
+
+=head2 DEC mode constants
+
+=over 4
+
+=item * C<ModeCursorKeys> / C<DECCKM> - 1
+
+=item * C<ModeOrigin> / C<DECOM> - 6
+
+=item * C<ModeAutoWrap> / C<DECAWM> - 7
+
+=item * C<ModeMouseX10> - 9
+
+=item * C<ModeTextCursorEnable> / C<DECTCEM> - 25
+
+=item * C<ShowCursor> - C<\e[?25h> (pre-built)
+
+=item * C<HideCursor> - C<\e[?25l> (pre-built)
+
+=item * C<ModeNumericKeypad> / C<DECNKM> - 66
+
+=item * C<ModeBackarrowKey> / C<DECBKM> - 67
+
+=item * C<ModeLeftRightMargin> / C<DECLRMM> - 69
+
+=item * C<ModeMouseNormal> - 1000
+
+=item * C<ModeMouseHighlight> - 1001
+
+=item * C<ModeMouseButtonEvent> - 1002
+
+=item * C<ModeMouseAnyEvent> - 1003
+
+=item * C<ModeFocusEvent> - 1004
+
+=item * C<ModeMouseExtUtf8> - 1005
+
+=item * C<ModeMouseExtSgr> - 1006
+
+=item * C<ModeMouseExtUrxvt> - 1015
+
+=item * C<ModeMouseExtSgrPixel> - 1016
+
+=item * C<ModeAltScreen> - 1047
+
+=item * C<ModeSaveCursor> - 1048
+
+=item * C<ModeAltScreenSaveCursor> - 1049
+
+=item * C<ModeBracketedPaste> - 2004
+
+=item * C<ModeSynchronizedOutput> - 2026
+
+=item * C<ModeUnicodeCore> - 2027
+
+=item * C<ModeLightDark> - 2031
+
+=item * C<ModeInBandResize> - 2048
+
+=item * C<ModeWin32Input> - 9001
+
+=back
+
+=head1 MOUSE
+
+=head2 encode_mouse_button ( $button, $motion, $shift, $alt, $ctrl )
+
+Encodes a button plus modifier state into the SGR mouse button byte. C<$button> is one of the C<Mouse*> constants
+below; C<$motion>, C<$shift>, C<$alt>, C<$ctrl> are booleans. The result is suitable for the C<"$b;$x;$yM"> body of an
+SGR mouse report.
+
+=over 4
+
+=item * C<MouseNone> - 0 (no button pressed)
+
+=item * C<MouseLeft> - 1
+
+=item * C<MouseMiddle> - 2
+
+=item * C<MouseRight> - 3
+
+=item * C<MouseWheelUp> - 4
+
+=item * C<MouseWheelDown> - 5
+
+=item * C<MouseWheelLeft> - 6
+
+=item * C<MouseWheelRight> - 7
+
+=item * C<MouseBackward> - 8
+
+=item * C<MouseForward> - 9
+
+=item * C<MouseButton1> .. C<MouseButton11> - 1 .. 11
+
+=item * C<MouseRelease> - 0 (release marker)
+
+=back
+
+=head2 mouse_sgr ( $button, $x, $y, $release )
+
+Returns the SGR mouse report sequence C<\e[<$b;$x;$yM> (or C<m> when C<$release> is true). Coordinates are 1-based and
+non-negative, matching the C<1006> extension.
+
+=head1 NOTIFICATIONS (OSC 9, OSC 99)
+
+=head2 notify ( $text )
+
+Returns C<\e]9;$text\a>; the terminal displays a desktop notification (iTerm2/xterm extension).
+
+=head2 desktop_notification ( $payload, @metadata )
+
+Returns C<\e]99;$metadata;$payload\a>; the terminal shows a desktop notification with colon-separated metadata (e.g.
+C<notify-send> style title/body flags, as used by VTE).
+
+=head1 SGR / SELECT GRAPHIC RENDITION
+
+=head2 SelectGraphicRendition ( @attrs )
+
+Alias: C<SGR>.
+
+Returns a single SGR sequence C<\e[<params>m> from the given attribute numbers; negative values are clamped to 0, and
+no arguments produce a plain C<\e[m> reset. Attribute constants for the standard 0-59 SGR repertoire and their bright
+(90-107) variants are exported:
+
+=over 4
+
+=item * C<AttrReset> - 0
+
+=item * C<AttrBold> - 1
+
+=item * C<AttrFaint> - 2
+
+=item * C<AttrItalic> - 3
+
+=item * C<AttrUnderline> - 4
+
+=item * C<AttrBlink> - 5
+
+=item * C<AttrRapidBlink> - 6
+
+=item * C<AttrReverse> - 7
+
+=item * C<AttrConceal> - 8
+
+=item * C<AttrStrikethrough> - 9
+
+=item * C<AttrNormalIntensity> - 22
+
+=item * C<AttrNoItalic> - 23
+
+=item * C<AttrNoUnderline> - 24
+
+=item * C<AttrNoBlink> - 25
+
+=item * C<AttrNoReverse> - 27
+
+=item * C<AttrNoConceal> - 28
+
+=item * C<AttrNoStrikethrough> - 29
+
+=item * C<AttrBlackForegroundColor> .. C<AttrWhiteForegroundColor> - 30 .. 37
+
+=item * C<AttrExtendedForegroundColor> - 38
+
+=item * C<AttrDefaultForegroundColor> - 39
+
+=item * C<AttrBlackBackgroundColor> .. C<AttrWhiteBackgroundColor> - 40 .. 47
+
+=item * C<AttrExtendedBackgroundColor> - 48
+
+=item * C<AttrDefaultBackgroundColor> - 49
+
+=item * C<AttrExtendedUnderlineColor> - 58
+
+=item * C<AttrDefaultUnderlineColor> - 59
+
+=item * C<AttrBrightBlackForegroundColor> .. C<AttrBrightWhiteForegroundColor> - 90 .. 97
+
+=item * C<AttrBrightBlackBackgroundColor> .. C<AttrBrightWhiteBackgroundColor> - 100 .. 107
+
+=item * C<AttrRGBColorIntroducer> - 2 (the C<38;2;r;g;b> color-space selector)
+
+=item * C<AttrExtendedColorIntroducer> - 5 (the C<38;5;n> color-space selector)
+
+=back
+
+Deprecated C<*Attr> aliases matching the Go C<Attr*> naming (C<BoldAttr>, C<ItalicAttr>, C<RedForegroundColorAttr>, and
+so on) are exported too and map to the C<Attr*> constants above.
+
+=head1 PASSTHROUGH
+
+=head2 ScreenPassthrough ( $sequence, $limit = 0 )
+
+Wraps C<$sequence> in a DCS I<screen> passthrough: C<\eP...\e\\>. When C<$limit> is positive the payload is chunked
+into pieces no longer than C<$limit> bytes, separated by C<\e\\\eP> so that long frames survive terminals that cap DCS
+payload lengths.
+
+=head2 TmuxPassthrough ( $sequence )
+
+Wraps C<$sequence> in the tmux passthrough prefix C<\ePtmux;...\e\\>, escaping any embedded ESC byte as a doubled
+C<\e\e> per tmux's rule.
+
+=head1 TERMINAL-SPECIFIC EXTENSIONS
+
+=head2 URxvtExt ( $extension, @params )
+
+Returns an rxvt-unicode extension frame C<\e]777;$extension;$params\x07>.
+
+=head2 ITerm2 ( $data )
+
+Returns an iTerm2 escape frame C<\e]1337;$data\x07> for iTerm2-proprietary codes such as inline images or the
+copy-to-clipboard (C<CopyToClipboard>) action.
+
+=head1 COLOR CONVERSION
+
+=head2 color_to_hex_string ( $hex )
+
+Formats an integer RGB value as a C<#rrggbb> string.
+
+=head2 hex_to_rgb ( $hex )
+
+Splits an integer RGB value into an C<( r, g, b )> list of 0-255 bytes.
+
+=head2 ansi_to_rgb ( $index )
+
+Returns the C<( r, g, b )> triple for an ANSI 256-color palette index (0-255). The table includes the 16 base colors
+and the standard 216-color cube plus 24 grayscale entries.
+
+=head2 convert_256 ( $hex )
+
+Converts a 24-bit color value (as returned by C<hex_to_rgb>) to the nearest ANSI 256-color palette index, choosing
+between the color cube and the gray ramp by squared-distance comparison. This is the classic C<{r,g,b} -> 256> mapping
+used when a terminal only supports 256 colors.
+
+=head1 PALETTE (OSC 104)
+
+=head2 set_palette ( $index, $r, $g, $b )
+
+Returns C<\e]PE<lt>indexE<gt>rrggbb\a> (the xterm C<OSC 104> color-set form) which repaints one of the 16 color-slot
+colors. Returns the empty string for out-of-range indices or missing components.
+
+=head2 ResetPalette
+
+Constant C<\e]R\a> that resets the entire color palette to the terminal defaults.
+
+=head1 PROGRESS BAR (OSC 9;4)
+
+=head2 set_progress_bar ( $pct )
+
+Returns C<\e]9;4;1;$pct\a>; sets the terminal's progress bar to a percentage in 0-100 (clamped).
+
+=head2 set_error_progress_bar ( $pct )
+
+Returns C<\e]9;4;2;$pct\a>; sets an error-styled progress bar.
+
+=head2 set_warning_progress_bar ( $pct )
+
+Returns C<\e]9;4;4;$pct\a>; sets a warning-styled progress bar.
+
+=over 4
+
+=item * C<ResetProgressBar>
+
+Constant C<\e]9;4;0\a> that clears the terminal progress bar.
+
+=item * C<SetIndeterminateProgressBar>
+
+Constant C<\e]9;4;3\a> that shows an indeterminate (animated) progress bar.
+
+=back
+
+=head1 SEE ALSO
+
+=over 4
+
+=item * L<Cancer::Screen> - parses these sequences into a cell buffer
+
+=item * L<Cancer::Renderer> - emits mode framing and mouse sequences while flushing views
+
+=item * L<Cancer::Style> - builds SGR-colored, bordered text
+
+=item * L<Cancer::Terminal> - the abstract terminal interface these sequences are written to
+
+=item * L<Cancer::Ansi::Parser> - the input-side parser of the sequences built here
+
+=item * L<ANSI escape codes|https://en.wikipedia.org/wiki/ANSI_escape_code> - the ECMA-48
+repertoire that most of these sequences implement
+
+=item * L<xterm control sequences|https://invisible-island.net/xterm/ctlseqs/ctlseqs.html> -
+the OSC/DEC private sequences (colors, clipboard, titles, mouse, paste)
+
+=item * L<The kitty keyboard protocol|https://sw.kovidgoyal.net/kitty/keyboard-protocol/>
+
+=item * L<The kitty graphics protocol|https://sw.kovidgoyal.net/kitty/graphics-protocol/>
+
+=back
+
+The upstream cousin of this module is C<github.com/charmbracelet/x/ansi>, the escape-sequence parser and builder used
+by Bubble Tea v2; Cancer::Ansi provides the builder half (and C<Cancer::Ansi::Parser> the parser half), tuned to emit
+byte-for-byte compatible sequences.
+
+=head1 AUTHOR
+
+Sanko Robinson - L<https://github.com/sanko>
+
+=head1 LICENSE
+
+This software is Copyright (c) 2026 by Cancer Authors.
+
+This is free software, licensed under:
+
+  The Artistic License 2.0 (GPL Compatible)
+
+The full text of the license can be found in the F<LICENSE> file included with this distribution.
+
+=cut
