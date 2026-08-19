@@ -2,14 +2,13 @@ use v5.42;
 use experimental 'class';
 use Test2::V1 -ipP;
 use lib 'lib', '../lib';
+use blib;
 
 # Port of TestFullImage from charmbracelet/x/ansi/sixel/sixel_test.go
 # Inline encoder/decoder for sixel round-trip validation.
 use Cancer::Ansi::Sixel qw(WriteRaster DecodeRaster DecodeRepeat);
 
-# ===================================================================
 # SixelColor  (channels 0-100)
-# ===================================================================
 package SixelColor {
     use v5.42;
     sub new( $c, $r, $g, $b, $a ) { bless { r => $r // 0, g => $g // 0, b => $b // 0, a => $a // 0 }, $c }
@@ -21,9 +20,7 @@ package SixelColor {
     sub clone($s)        { bless { r => $s->{r}, g => $s->{g}, b => $s->{b}, a => $s->{a} }, ref $s }
 }
 
-# ===================================================================
 # Color conversion  (8-bit RGBA -> sixelColor 0-100)
-# ===================================================================
 sub _convert_channel ($ch) { int( ( $ch * 257 + 328 ) * 100 / 0xffff ) }
 
 sub _convert_color ( $r, $g, $b, $a ) {
@@ -31,9 +28,7 @@ sub _convert_color ( $r, $g, $b, $a ) {
 }
 sub _ckey ($c) { pack 'V4', $c->{r} // 0, $c->{g} // 0, $c->{b} // 0, $c->{a} // 0 }
 
-# ===================================================================
 # Median-cut palette (simplified for test images)
-# ===================================================================
 package QCube {
     use v5.42;
     sub new( $c, %a ) { bless { start => 0, len => 0, ch => 'r', score => 0, pixels => 0, %a }, $c }
@@ -155,9 +150,7 @@ sub _new_sixel_palette ( $img, $max_colors ) {
     { palette => $palette, convert => \%convert, indexes => \%indexes };
 }
 
-# ===================================================================
 # Encoder
-# ===================================================================
 sub _band_masks ( $img, $band_y, $palette_idx, $indexes ) {
     my $w = $img->{w};
     my $h = $img->{h};
@@ -226,9 +219,7 @@ sub _encode_sixel ($img) {
     join '', @out;
 }
 
-# ===================================================================
 # Decoder
-# ===================================================================
 sub _decode_color ($data) {
     return ( undef, 0 ) if !length $data || ord( substr( $data, 0, 1 ) ) != ord('#');
     return ( undef, 0 ) if length $data < 2;
@@ -287,7 +278,7 @@ sub _decode_sixel ($data) {
         [ 153, 87,  153 ],
         [ 87,  153, 153 ],
         [ 153, 153, 87 ],
-        [ 204, 204, 204 ],
+        [ 204, 204, 204 ]
     );
     for my $i ( 0 .. 15 ) { my $d = $defaults[$i]; $palette[$i] = [ $d->[0] * 257, $d->[1] * 257, $d->[2] * 257, 0xFFFF ] }
     my ( $cur_pal_idx, $cur_x, $cur_band_y ) = ( 0, 0, 0 );
@@ -374,9 +365,7 @@ sub _decode_sixel ($data) {
     { w => $img_w, h => $img_h, data => \@image };
 }
 
-# ===================================================================
 # Test
-# ===================================================================
 sub _make_img ( $w, $h, $colors ) {
 
     # $colors: hash of index => [R,G,B,A]; unlisted indices inherit from previous
@@ -431,7 +420,7 @@ subtest 'TestFullImage' => sub {
                 30 => [ 64,  0,   0,   255 ],
                 32 => [ 0,   64,  0,   255 ],
                 33 => [ 64,  0,   0,   255 ],
-                35 => [ 0,   64,  0,   255 ],
+                35 => [ 0,   64,  0,   255 ]
             },
         },
         {   name   => '3x12 single color with transparent band in the middle',
@@ -472,4 +461,5 @@ subtest 'TestFullImage' => sub {
         ok $ok, "$tt->{name}: all pixels match";
     }
 };
+#
 done_testing;

@@ -1,29 +1,24 @@
 use Test2::V1 -ipP;
-use Cancer::Ansi qw(set_palette);
-subtest 'TestSetPalette' => sub {
-    my @cases = (
-        { index => -1, r => 255, g => 0,   b => 0,   want => '' },
-        { index =>  0, r => 255, g => 0,   b => 0,   want => "\e]P0ff0000\a" },
-        { index =>  1, r => 0,   g => 255, b => 0,   want => "\e]P100ff00\a" },
-        { index =>  2, r => 0,   g => 0,   b => 255, want => "\e]P20000ff\a" },
-        { index =>  3, r => 255, g => 255, b => 0,   want => "\e]P3ffff00\a" },
-        { index =>  4, r => 255, g => 0,   b => 255, want => "\e]P4ff00ff\a" },
-        { index =>  5, r => 0,   g => 255, b => 255, want => "\e]P500ffff\a" },
-        { index =>  6, r => 192, g => 192, b => 192, want => "\e]P6c0c0c0\a" },
-        { index =>  7, r => 128, g => 128, b => 128, want => "\e]P7808080\a" },
-        { index =>  8, r => 255, g => 128, b => 128, want => "\e]P8ff8080\a" },
-        { index =>  9, r => 128, g => 255, b => 128, want => "\e]P980ff80\a" },
-        { index => 10, r => 128, g => 128, b => 255, want => "\e]Pa8080ff\a" },
-        { index => 11, r => 255, g => 255, b => 128, want => "\e]Pbffff80\a" },
-        { index => 12, r => 255, g => 128, b => 255, want => "\e]Pcff80ff\a" },
-        { index => 13, r => 128, g => 255, b => 255, want => "\e]Pd80ffff\a" },
-        { index => 14, r => 192, g => 192, b => 192, want => "\e]Pec0c0c0\a" },
-        { index => 15, r => 0,   g => 0,   b => 0,   want => "\e]Pf000000\a" },
-        { index => 16, r => 255, g => 0,   b => 0,   want => '' },
-    );
-    for my $c (@cases) {
-        my $got = set_palette( $c->{index}, $c->{r}, $c->{g}, $c->{b} );
-        is $got, $c->{want}, "SetPalette($c->{index}, $c->{r}, $c->{g}, $c->{b})";
-    }
-};
+use blib;
+use Cancer::Ansi qw[set_palette];
+#
+is set_palette( -1, 255, 0,   0 ),   '',              'set_palette(-1, 255, 0, 0)';
+is set_palette(  0, 255, 0,   0 ),   "\e]P0ff0000\a", 'set_palette(0, 255, 0, 0)';
+is set_palette(  1, 0,   255, 0 ),   "\e]P100ff00\a", 'set_palette(1, 0, 255, 0)';
+is set_palette(  2, 0,   0,   255 ), "\e]P20000ff\a", 'set_palette(2, 0, 0, 255)';
+is set_palette(  3, 255, 255, 0 ),   "\e]P3ffff00\a", 'set_palette(3, 255, 255, 0)';
+is set_palette(  4, 255, 0,   255 ), "\e]P4ff00ff\a", 'set_palette(4, 255, 0, 255)';
+is set_palette(  5, 0,   255, 255 ), "\e]P500ffff\a", 'set_palette(5, 0, 255, 255)';
+is set_palette(  6, 192, 192, 192 ), "\e]P6c0c0c0\a", 'set_palette(6, 192, 192, 192)';
+is set_palette(  7, 128, 128, 128 ), "\e]P7808080\a", 'set_palette(7, 128, 128, 128)';
+is set_palette(  8, 255, 128, 128 ), "\e]P8ff8080\a", 'set_palette(8, 255, 128, 128)';
+is set_palette(  9, 128, 255, 128 ), "\e]P980ff80\a", 'set_palette(9, 128, 255, 128)';
+is set_palette( 10, 128, 128, 255 ), "\e]Pa8080ff\a", 'set_palette(10, 128, 128, 255)';
+is set_palette( 11, 255, 255, 128 ), "\e]Pbffff80\a", 'set_palette(11, 255, 255, 128)';
+is set_palette( 12, 255, 128, 255 ), "\e]Pcff80ff\a", 'set_palette(12, 255, 128, 255)';
+is set_palette( 13, 128, 255, 255 ), "\e]Pd80ffff\a", 'set_palette(13, 128, 255, 255)';
+is set_palette( 14, 192, 192, 192 ), "\e]Pec0c0c0\a", 'set_palette(14, 192, 192, 192)';
+is set_palette( 15, 0,   0,   0 ),   "\e]Pf000000\a", 'set_palette(15, 0, 0, 0)';
+is set_palette( 16, 255, 0,   0 ),   '',              'set_palette(16, 255, 0, 0)';
+#
 done_testing;

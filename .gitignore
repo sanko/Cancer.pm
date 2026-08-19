@@ -39,3 +39,5 @@ eg/lib/*.pm
 
 *.session
 
+tty-*
+vendor/

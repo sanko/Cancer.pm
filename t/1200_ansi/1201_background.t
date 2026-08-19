@@ -4,18 +4,11 @@ use Test2::V1 -ipP;
 use lib 'lib', '../../lib';
 
 # Ported from charmbracelet/x/ansi background_test.go
-use Cancer::Ansi;
-subtest 'TestSetForegroundColorNil' => sub {
-    my $s = Cancer::Ansi::set_foreground_color('');
-    is $s, "\e]10;\a", 'SetForegroundColor("")';
-};
-subtest 'TestStringImplementations' => sub {
-    my $fg = Cancer::Ansi::set_foreground_color('#ff00ff');
-    my $bg = Cancer::Ansi::set_background_color('#eeeeee');
-    my $cc = Cancer::Ansi::set_cursor_color('#ffeeaa');
-    is $fg, "\e]10;#ff00ff\a", 'SetForegroundColor(#ff00ff)';
-    is $bg, "\e]11;#eeeeee\a", 'SetBackgroundColor(#eeeeee)';
-    is $cc, "\e]12;#ffeeaa\a", 'SetCursorColor(#ffeeaa)';
-};
+use Cancer::Ansi qw[/^set_.*color$/];
+#
+is set_foreground_color(''),        "\e]10;\a",        'set_foreground_color("")';
+is set_foreground_color('#ff00ff'), "\e]10;#ff00ff\a", 'set_foreground_color(#ff00ff)';
+is set_background_color('#eeeeee'), "\e]11;#eeeeee\a", 'set_background_color(#eeeeee)';
+is set_cursor_color('#ffeeaa'),     "\e]12;#ffeeaa\a", 'set_cursor_color(#ffeeaa)';
 #
 done_testing;

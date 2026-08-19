@@ -1,0 +1,130 @@
+=head1 NAME
+
+Cancer::Ansi::Iterm2 - Build the control sequences of the iTerm2 inline image protocol
+
+=head1 SYNOPSIS
+
+    use Cancer::Ansi::Iterm2 qw[File Cells Pixels];
+
+    my $seq = "\e]1337;" . File(
+        {
+            Name    => 'logo.png',
+            Size    => 4096,
+            Width   => Pixels(40),
+            Height  => Pixels(25),
+            Content => $png_data
+        }
+    ) . "\a";
+
+    print $seq;
+
+=head1 DESCRIPTION
+
+B<Cancer::Ansi::Iterm2> is a tiny helper that assembles the parameter payloads of the I<iTerm2 inline image protocol>,
+the escape-sequence-based way iTerm2 renders images inline in the terminal. Each function here returns a fragment of
+the OSC payload (the part between the C<\e]1337;> introducer and the string terminator); the module does not emit the
+enclosing escape bytes itself.
+
+The building blocks cover the full protocol surface: size units, per-file options, single-part and multipart
+transmission, and the multipart framing commands. The related L<Cancer::Ansi::Kitty> and L<Cancer::Ansi::Sixel> modules
+provide the other image formats Cancer can talk to, and L<Cancer::Ansi::Parser> knows how to receive what terminals
+echo back.
+
+=head1 FUNCTIONS
+
+=head2 size units
+
+=over
+
+=item * C<Auto> - The constant C<'auto'>, used to ask the terminal to size the
+image at its natural scale.
+
+=item * C<Cells($n)> - Returns C<$n> as a plain string, i.e. a size expressed
+in character cells.
+
+=item * C<Pixels($n)> - Returns C<"${n}px">, a size expressed in pixels.
+
+=item * C<Percent($n)> - Returns C<"${n}%">, a size expressed as a percentage
+of the available space.
+
+=back
+
+=head2 C<FileOpts( $f )>
+
+Serialises the options of a file hashref into the C<name=...;size=...> option list. Recognised keys:
+
+=over
+
+=item * C<Name> - The filename, emitted as C<name=...>.
+
+=item * C<Size> - The file size in bytes, emitted as C<size=...>.
+
+=item * C<Width> / C<Height> - Optional sizes, emitted as C<width=...> and
+C<height=...>. Pass a value from the size-unit helpers.
+
+=item * C<IgnoreAspectRatio> - Emits C<preserveAspectRatio=0>.
+
+=item * C<Inline> - Emits C<inline=1>.
+
+=item * C<DoNotMoveCursor> - Emits C<doNotMoveCursor=1>.
+
+=back
+
+=head2 C<File( $f )>
+
+Returns a complete C<File=...> payload for a single image transfer. When the hashref has a C<Content> key, the file
+data is appended after a colon: C<File=opts:content>.
+
+=head2 C<MultipartFile( $f )
+
+Returns a C<MultipartFile=...> payload that begins a multipart transfer of the given file options. Follow it with one
+or more C<FilePart> calls and close with C<FileEnd>.
+
+=head2 C<FilePart( $f )>
+
+Returns a C<FilePart=...> payload carrying one chunk of a multipart transfer. The chunk bytes live in the C<Content>
+key.
+
+=head2 C<FileEnd( $f )>
+
+Returns the C<FileEnd> marker that terminates a multipart transfer.
+
+=head1 SEE ALSO
+
+=over
+
+=item * L<Cancer::Ansi::Kitty> - Constants and helpers for the kitty graphics
+protocol, the other inline image format used by Cancer.
+
+=item * L<Cancer::Ansi::Sixel> - Encoders and decoders for DEC sixel graphics.
+
+=item * L<Cancer::Ansi::Parser> - The ANSI state-machine parser used for
+incoming terminal data.
+
+=back
+
+The upstream cousin of this module is the I<Catp> image protocol implementation used by
+L<charmbracelet/vhs|https://github.com/charmbracelet/vhs> and Bubble Tea's I<x/term> for iTerm2 image display. The
+protocol itself is documented at L<iTerm2 image protocol|https://iterm2.com/documentation-images.html>, and the
+enclosing escape syntax at L<ANSI escape code|https://en.wikipedia.org/wiki/ANSI_escape_code>.
+
+=head1 LICENSE
+
+This software is Copyright (c) 2020 by Sanko Robinson.
+
+This is free software, licensed under:
+
+  The Artistic License 2.0 (GPL Compatible)
+
+See the F<LICENSE> file for full text.
+
+=head1 AUTHOR
+
+Sanko Robinson  L<https://github.com/sanko>
+
+=begin stopwords
+
+
+=end stopwords
+
+=cut

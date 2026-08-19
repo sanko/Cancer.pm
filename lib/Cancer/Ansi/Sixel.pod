@@ -1,0 +1,124 @@
+=head1 NAME
+
+Cancer::Ansi::Sixel - Build and parse DEC sixel graphics primitives
+
+=head1 SYNOPSIS
+
+    use Cancer::Ansi::Sixel qw[WriteRaster WriteRepeat DecodeRaster DecodeRepeat];
+
+    my $raster = WriteRaster( 2, 1, 400, 240 );     # "2;1;400;240"
+    my $repeat = WriteRepeat( 64, '?' );            # "!64?"
+
+    my ( $r, $consumed ) = DecodeRaster('"2;1;400;240ABCD');
+    my ( $rep, $n )      = DecodeRepeat('!64?ABCD');
+
+=head1 DESCRIPTION
+
+B<Cancer::Ansi::Sixel> provides small functional helpers and two tiny value classes for the I<DEC Sixel Graphics>
+format, the bitmap encoding that DEC terminals have supported since the VT330. Sixel images are transmitted inside a
+DCS escape sequence; this module handles two of the format's control primitives: the raster attributes command and the
+repeat introducer.
+
+Everything is exported on request through C<Exporter>. Each of the four primitives has a C<Write*> encoder (returns the
+textual sixel command) and a C<Decode*> counterpart (returns a parsed object plus the number of bytes consumed). The
+companion classes C<Cancer::Ansi::Sixel::Raster> and C<Cancer::Ansi::Sixel::Repeat> wrap the decoded values and can
+re-serialise themselves.
+
+=head1 FUNCTIONS
+
+=head2 C<Raster( %attr )>
+
+Returns a blessed C<Cancer::Ansi::Sixel::Raster> initialised with the given attributes, defaulting C<Pan>, C<Pad>,
+C<Ph> and C<Pv> to C<0>.
+
+=head2 C<WriteRaster( $pan, $pad, $ph //= 0, $pv //= 0 )>
+
+Serialises a raster attributes command. A C<$pad> of C<0> is normalised to C<1> (a pad ratio of zero is not
+meaningful). When both C<$ph> and C<$pv> are zero the image is unscaled and the size fields are omitted, producing
+C<"pan;pad">; otherwise the full C<"pan;pad;ph;pv"> form is returned.
+
+=head2 C<DecodeRaster( $data )>
+
+Parses a raster attributes string. Returns a two-element list C<($raster, $consumed)> where C<$raster> is a
+C<Cancer::Ansi::Sixel::Raster> and C<$consumed> is the number of bytes consumed. Data that does not begin with the C<">
+attribute introducer yields a default raster and a consumed count of C<0>.
+
+=head2 C<Repeat( $count, $char )>
+
+Returns a blessed C<Cancer::Ansi::Sixel::Repeat> carrying a repeat count and a character.
+
+=head2 C<WriteRepeat( $count, $char )>
+
+Serialises a repeat introducer as C<"!countchar">, the sixel shorthand for repeating a band character C<$count> times.
+
+=head2 C<DecodeRepeat($data)>
+
+Parses a repeat introducer string. Returns a two-element list C<($repeat, $consumed)>. Data that does not start with
+C<!> or is shorter than three bytes yields a default C<Repeat(0, '')> and a consumed count of C<0>.
+
+=head1 METHODS
+
+=head2 Cancer::Ansi::Sixel::Raster
+
+=over
+
+=item * C<Pan()>, C<Pad()>, C<Ph()>, C<Pv()> - Accessors for the raster
+attribute fields.
+
+=item * C<String()> - Re-serialises the raster through C<WriteRaster>.
+
+=back
+
+=head2 Cancer::Ansi::Sixel::Repeat
+
+=over
+
+=item * C<Count()> - The repeat count.
+
+=item * C<Char()> - The repeated character.
+
+=item * C<String()> - Re-serialises the repeat through C<WriteRepeat>.
+
+=back
+
+=head1 SEE ALSO
+
+=over
+
+=item * L<Cancer::Ansi::Kitty> - The kitty graphics protocol, Cancer's primary
+inline image format.
+
+=item * L<Cancer::Ansi::Iterm2> - The iTerm2 inline image protocol.
+
+=item * L<Cancer::Ansi::Parser> - The escape sequence parser that can extract
+DCS sixel streams from terminal output.
+
+=item * L<Cancer::Ansi::Kitty::Encoder> - A companion encoder for raw pixel
+data.
+
+=back
+
+The upstream cousin of this module is the sixel support in Bubble Tea's I<x/term>. The format is specified at L<DEC
+Sixel Graphics|https://vt100.net/docs/vt3xx-gp/chapter14.html>, with the enclosing escape syntax covered by L<ANSI
+escape code|https://en.wikipedia.org/wiki/ANSI_escape_code>.
+
+=head1 LICENSE
+
+This software is Copyright (c) 2020 by Sanko Robinson.
+
+This is free software, licensed under:
+
+  The Artistic License 2.0 (GPL Compatible)
+
+See the F<LICENSE> file for full text.
+
+=head1 AUTHOR
+
+Sanko Robinson  L<https://github.com/sanko>
+
+=begin stopwords
+
+
+=end stopwords
+
+=cut

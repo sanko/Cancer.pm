@@ -1,0 +1,84 @@
+=head1 NAME
+
+Cancer::Ansi::Kitty::Encoder - Encode raw pixels into kitty graphics protocol payloads
+
+=head1 SYNOPSIS
+
+    use Cancer::Ansi::Kitty qw[RGBA Zlib];
+    use Cancer::Ansi::Kitty::Encoder;
+
+    my $payload = Cancer::Ansi::Kitty::Encoder->new(
+        format   => RGBA,
+        compress => 1
+    )->encode( $rgba_pixels, 40, 25 );
+
+=head1 DESCRIPTION
+
+B<Cancer::Ansi::Kitty::Encoder> serialises raw pixel data into the payload bytes of the I<kitty graphics protocol>.
+Given a packed byte string of RGBA samples plus a width and height, it produces either a raw RGBA or RGB sample stream,
+or a complete PNG file built by hand (signature, C<IHDR>, C<IDAT> with a filter byte per scanline, and C<IEND>, each
+with a proper CRC). When requested, the result is zlib-compressed as the protocol expects for payloads with the zlib
+flag.
+
+It pairs with L<Cancer::Ansi::Kitty::Decoder>, which performs the inverse operation, and relies on
+L<Cancer::Ansi::Kitty> for the shared format constants.
+
+=head1 CONSTRUCTOR PARAMETERS
+
+=over
+
+=item * C<compress> - When true, the encoded payload is compressed with
+C<Compress::Zlib::compress>. Default: C<0>.
+
+=item * C<format> - The payload format. Defaults to C<RGBA> when C<0>. May be
+C<RGBA>, C<RGB> or C<PNG> from L<Cancer::Ansi::Kitty>.
+
+=back
+
+=head1 METHODS
+
+=head2 C<encode( $pixels, $width, $height )>
+
+Encodes the RGBA sample string C<$pixels> into a payload for an image C<$width> by C<$height>. Returns an empty string
+when C<$pixels> is undefined or empty. Unsupported formats die with a descriptive message.
+
+=head1 SEE ALSO
+
+=over
+
+=item * L<Cancer::Ansi::Kitty::Decoder> - The inverse operation, parsing
+payloads back into pixels.
+
+=item * L<Cancer::Ansi::Kitty> - The protocol constants (C<RGBA>, C<RGB>,
+C<PNG>) shared by both ends.
+
+=item * L<Cancer::Ansi::Sixel> - The alternative DEC sixel image format.
+
+=item * L<Cancer::Ansi::Iterm2> - The iTerm2 inline image protocol.
+
+=back
+
+The upstream cousin of this module is the kitty graphics protocol implementation in Bubble Tea's I<x/term>. The wire
+format is specified at L<kitty graphics protocol|https://sw.kovidgoyal.net/kitty/graphics-protocol/>, and the PNG
+container at L<PNG specification|https://www.w3.org/TR/png-3/>.
+
+=head1 LICENSE
+
+This software is Copyright (c) 2020 by Sanko Robinson.
+
+This is free software, licensed under:
+
+  The Artistic License 2.0 (GPL Compatible)
+
+See the F<LICENSE> file for full text.
+
+=head1 AUTHOR
+
+Sanko Robinson  L<https://github.com/sanko>
+
+=begin stopwords
+
+
+=end stopwords
+
+=cut

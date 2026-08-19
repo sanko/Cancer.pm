@@ -1,0 +1,235 @@
+=head1 NAME
+
+Cancer::Ansi::Parser - ECMA-48 style state machine for parsing ANSI escape sequences
+
+=head1 SYNOPSIS
+
+    use Cancer::Ansi::Parser qw(new_parser parser_parse params command
+        Final);
+
+    my $p = new_parser;
+    set_handler( $p, {
+        HandleCsi => sub ( $cmd, $params ) {
+            print "CSI final=", Final($cmd), " params=@$params\n";
+        },
+        Print => sub { print shift }
+    } );
+
+    parser_parse( $p, "\e[31mred text\e[0m" );
+
+=head1 DESCRIPTION
+
+B<Cancer::Ansi::Parser> is a hand-written, table-driven state machine that parses terminal byte streams according to
+the ECMA-48 grammar: CSI, DCS, OSC, SOS, PM and APC sequences, ESC intermediates, C1 controls, and multi-byte UTF-8
+text. It is a Perl port of the escape sequence parser in Go's I<x/term>, and Cancer uses it whenever it needs to
+inspect or split raw terminal input, for example in the L<Cancer::Ansi::Kitty::Decoder> pipeline and in the terminal
+data path shared with L<Cancer::Input::Parser>.
+
+The parser is a blessed hashref created by C<new_parser>; there is no class. Events are reported through a handler
+hashref whose keys are callback coderefs. Transitions are looked up in a pre-built 4096-entry table where each entry
+packs the next state and the action to perform. A small UTF-8 helper layer also tracks grapheme clusters so runes and
+combining marks survive the parsing process intact.
+
+=head1 STATES
+
+The following state constants are exported: C<GroundState>, C<CsiEntryState>, C<CsiIntermediateState>,
+C<CsiParamState>, C<DcsEntryState>, C<DcsIntermediateState>, C<DcsParamState>, C<DcsStringState>, C<EscapeState>,
+C<EscapeIntermediateState>, C<OscStringState>, C<SosStringState>, C<PmStringState>, C<ApcStringState>, and
+C<Utf8State>.
+
+=head1 ACTIONS
+
+The action constants exported are: C<NoneAction>, C<IgnoreAction>, C<ClearAction>, C<CollectAction>, C<PrefixAction>,
+C<DispatchAction>, C<ExecuteAction>, C<StartAction>, C<PutAction>, C<ParamAction> and C<PrintAction>. They describe
+what the parser must do with the current byte and are used internally by the transition table; C<parser_advance> also
+returns the action it performed.
+
+=head1 HANDLER CALLBACKS
+
+Set a handler hashref on the parser with C<set_handler>. Each key is optional; absent keys silently skip that event.
+
+=over
+
+=item * C<Print> - C<sub ($char)>. Called for printable characters in the
+ground state. The argument is a one-character string.
+
+=item * C<Execute> - C<sub ($byte)>. Called for executed control characters
+(C0 and C1 control codes).
+
+=item * C<HandleCsi> - C<sub ($cmd, \@params)>. Called when a complete CSI
+sequence dispatches. C<$cmd> packs the prefix, intermediates and final byte;
+see the Cmd helpers.
+
+=item * C<HandleEsc> - C<sub ($cmd)>. Called when a complete escape sequence
+dispatches.
+
+=item * C<HandleDcs> - C<sub ($cmd, \@params, $data)>. Called when a DCS
+string terminates.
+
+=item * C<HandleOsc> - C<sub ($cmd, $data)>. Called when an OSC string
+terminates. C<$cmd> is the numeric OSC command parsed from the leading digits.
+
+=item * C<HandleSos>, C<HandlePm>, C<HandleApc> - C<sub ($data)>. Called when
+the corresponding string type terminates.
+
+=back
+
+=head1 FUNCTIONS
+
+=head2 C<new_parser( )>
+
+Returns a new parser hashref initialised with a 32-slot parameter array, a 64 KiB data buffer, and the parser in
+C<GroundState>.
+
+=head2 C<set_handler( $p, $h )>
+
+Installs the handler hashref C<$h> on parser C<$p>.
+
+=head2 C<set_params_size( $p, $size )>
+
+Resizes the parser's parameter array to C<$size> slots.
+
+=head2 C<set_data_size( $p, $size )>
+
+Sets the DCS/OSC/APC data buffer size to C<$size>. A size of C<0> or less switches the buffer into grow-as-needed mode
+where collected data is appended unbounded.
+
+=head2 C<params( $p )>
+
+Returns the list of parameters collected by the most recent CSI/DCS sequence. Empty sequences return the empty list.
+
+=head2 C<param( $p, $i, $def )>
+
+Returns a two-element list C<($value, $has_more)> for parameter index C<$i>. Missing parameters substitute C<$def>, and
+the second element reports whether the parameter used the C<:> extension flag.
+
+=head2 C<command( $p )>
+
+Returns the packed command word of the most recent sequence. Decompose it with the Cmd helpers below.
+
+=head2 C<rune( $p )>
+
+For collected UTF-8 runs, returns the fully decoded codepoint character. Invalid data yields U+FFFD.
+
+=head2 C<control( $p )>
+
+Returns the raw final byte (C<< $cmd & 0xff >>) of the current sequence.
+
+=head2 C<data( $p )>
+
+Returns the data accumulated by the current DCS, OSC, SOS, PM or APC string.
+
+=head2 C<state( $p )>
+
+Returns the current parser state constant.
+
+=head2 C<state_name( $p )>
+
+Returns the symbolic name of the current state, e.g. C<'CsiParamState'>.
+
+=head2 C<parser_reset( $p )>
+
+Resets the command word, parameters and state back to C<GroundState>.
+
+=head2 C<parser_advance( $p, $byte )>
+
+Feeds a single byte (an integer) to the state machine and returns the action performed. This is the low-level entry
+point; C<parser_parse> is usually enough.
+
+=head2 C<parser_parse( $p, $bytes )>
+
+Feeds a whole byte string to the parser, dispatching to the handler callbacks as sequences complete. UTF-8 flagged
+strings are encoded first.
+
+=head1 CMD HELPERS
+
+A command word packs, from low to high bits: the final byte (bits 0..7), the prefix (bits 8..15) and the intermediate
+byte (bits 16..23).
+
+=over
+
+=item * C<Prefix($cmd)> - Extracts the prefix byte (C<< > >>, C<< = >>, C<< ? >>).
+
+=item * C<Intermediate($cmd)> - Extracts the intermediate byte (space through C</>).
+
+=item * C<Final($cmd)> - Extracts the final byte (C<@> through C<~>).
+
+=item * C<Command($prefix, $inter, $final)> - Packs a command word from its
+three parts.
+
+=back
+
+=head1 PARAM HELPERS
+
+=over
+
+=item * C<ParamVal($p, $def)> - Returns the numeric value of a stored
+parameter, substituting C<$def> for missing parameters.
+
+=item * C<HasMore($p)> - Returns true when the stored parameter carries the
+C<:> has-more extension flag.
+
+=item * C<Parameter($p, $has_more)> - Packs a numeric value plus optional
+has-more flag into stored form.
+
+=back
+
+=head1 PREFIX DETECTORS
+
+These functions inspect a raw byte string and return true when it starts with the indicated sequence, recognising both
+the C1 single-byte form and its two-byte ESC equivalent:
+
+C<HasCsiPrefix>, C<HasOscPrefix>, C<HasApcPrefix>, C<HasDcsPrefix>, C<HasSosPrefix>, C<HasPmPrefix>, C<HasStPrefix>,
+C<HasEscPrefix>.
+
+=head1 DECODE SEQUENCES
+
+=head2 C<DecodeSequence( $bytes, $state, $parser )>
+
+A secondary scanner that walks C<$bytes> looking for the first complete sequence. Returns a four-element list C<($seq,
+$is_printable, $bytes_consumed, $new_state)>. C<$seq> is the matched text (a printable grapheme cluster or the raw
+sequence bytes), C<$is_printable> is true for text, and C<$new_state> is one of C<NormalState>, C<DecodePrefixState>,
+C<DecodeParamsState>, C<DecodeIntermedState>, C<DecodeEscapeState> or C<DecodeStringState>. When a parser hashref is
+supplied, its command/params/data fields are updated to mirror the sequence as it is scanned.
+
+=head1 SEE ALSO
+
+=over
+
+=item * L<Cancer::Input::Parser> - The higher-level input parser that turns
+raw terminal bytes into key and mouse events.
+
+=item * L<Cancer::Ansi::Kitty> - Constants for the kitty graphics protocol,
+which the parser can receive.
+
+=item * L<Cancer::Ansi::Sixel> - The sixel image decoder, another consumer of
+escape stream data.
+
+=item * L<Cancer::Ansi::Iterm2> - The iTerm2 inline image protocol.
+
+=back
+
+The upstream cousin of this module is the escape sequence parser in Go's L<x/term|https://github.com/golang/term>,
+itself based on the state machine work of Thomas Dickey. The grammar it implements is described by L<ANSI escape
+code|https://en.wikipedia.org/wiki/ANSI_escape_code> and ECMA-48.
+
+=head1 LICENSE
+
+This software is Copyright (c) 2020 by Sanko Robinson.
+
+This is free software, licensed under:
+
+  The Artistic License 2.0 (GPL Compatible)
+
+See the F<LICENSE> file for full text.
+
+=head1 AUTHOR
+
+Sanko Robinson  L<https://github.com/sanko>
+
+=begin stopwords
+
+
+=end stopwords
+
+=cut

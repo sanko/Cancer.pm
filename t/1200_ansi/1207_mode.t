@@ -1,93 +1,65 @@
 use v5.42;
 use experimental 'class';
 use Test2::V1 -ipP;
+use blib;
 use lib 'lib', '../lib';
+use Data::Dump qw[pp];
 
 # Ported from charmbracelet/x/ansi mode_test.go
-use Cancer::Ansi;
-subtest 'TestModeSetting_Methods' => sub {
+use Cancer::Ansi qw[/Mode/ /mode/];
+subtest 'Mode.+ methods' => sub {
     my @tests = (
-        [ 'ModeNotRecognized',    Cancer::Ansi::ModeNotRecognized,    1, 0, 0, 0, 0 ],
-        [ 'ModeSet',              Cancer::Ansi::ModeSet,              0, 1, 0, 0, 0 ],
-        [ 'ModeReset',            Cancer::Ansi::ModeReset,            0, 0, 1, 0, 0 ],
-        [ 'ModePermanentlySet',   Cancer::Ansi::ModePermanentlySet,   0, 1, 0, 1, 0 ],
-        [ 'ModePermanentlyReset', Cancer::Ansi::ModePermanentlyReset, 0, 0, 1, 0, 1 ],
+        [ 'ModeNotRecognized',    ModeNotRecognized,    T(), F(), F(), F(), F() ],
+        [ 'ModeSet',              ModeSet,              F(), T(), F(), F(), F() ],
+        [ 'ModeReset',            ModeReset,            F(), F(), T(), F(), F() ],
+        [ 'ModePermanentlySet',   ModePermanentlySet,   F(), T(), F(), T(), F() ],
+        [ 'ModePermanentlyReset', ModePermanentlyReset, F(), F(), T(), F(), T() ]
     );
     for my $tc (@tests) {
         my ( $name, $mode, $nr, $is_set, $is_reset, $ps, $pr ) = @$tc;
         subtest $name => sub {
-            is Cancer::Ansi::mode_is_not_recognized($mode),    $nr,       'IsNotRecognized';
-            is Cancer::Ansi::mode_is_set($mode),               $is_set,   'IsSet';
-            is Cancer::Ansi::mode_is_reset($mode),             $is_reset, 'IsReset';
-            is Cancer::Ansi::mode_is_permanently_set($mode),   $ps,       'IsPermanentlySet';
-            is Cancer::Ansi::mode_is_permanently_reset($mode), $pr,       'IsPermanentlyReset';
-        };
+            is mode_is_not_recognized($mode),    $nr,       'mode_is_not_recognized';
+            is mode_is_set($mode),               $is_set,   'mode_is_set';
+            is mode_is_reset($mode),             $is_reset, 'mode_is_reset';
+            is mode_is_permanently_set($mode),   $ps,       'mode_is_permanently_set';
+            is mode_is_permanently_reset($mode), $pr,       'mode_is_permanently_reset';
+        }
     }
 };
-subtest 'TestSetMode' => sub {
-    my @tests = (
-        [ 'empty modes',              [],                                                                    '' ],
-        [ 'single ANSI mode',         [Cancer::Ansi::ModeKeyboardAction],                                    "\e[2h" ],
-        [ 'single DEC mode',          [Cancer::Ansi::ModeCursorKeys],                                        "\e[?1h" ],
-        [ 'multiple ANSI modes',      [ Cancer::Ansi::ModeKeyboardAction, Cancer::Ansi::ModeInsertReplace ], "\e[2;4h" ],
-        [ 'multiple DEC modes',       [ Cancer::Ansi::ModeCursorKeys, Cancer::Ansi::ModeAutoWrap ],          "\e[?1;7h" ],
-        [ 'mixed ANSI and DEC modes', [ Cancer::Ansi::ModeKeyboardAction, Cancer::Ansi::ModeCursorKeys ],    "\e[2h\e[?1h" ],
-        [   'multiple mixed ANSI and DEC modes',
-            [ Cancer::Ansi::ModeKeyboardAction, Cancer::Ansi::ModeInsertReplace, Cancer::Ansi::ModeCursorKeys, Cancer::Ansi::ModeAutoWrap ],
-            "\e[2;4h\e[?1;7h"
-        ],
-    );
-    for my $tc (@tests) {
-        my ( $name, $modes, $want ) = @$tc;
-        my $got = Cancer::Ansi::set_mode(@$modes);
-        is $got, $want, $name;
-    }
+subtest set_mode => sub {
+    is set_mode(),                                                                      '',                'empty modes';
+    is set_mode(ModeKeyboardAction),                                                    "\e[2h",           'single ANSI mode';
+    is set_mode(ModeCursorKeys),                                                        "\e[?1h",          'single DEC mode';
+    is set_mode( ModeKeyboardAction, ModeInsertReplace ),                               "\e[2;4h",         'multiple ANSI modes';
+    is set_mode( ModeCursorKeys, ModeAutoWrap ),                                        "\e[?1;7h",        'multiple DEC modes';
+    is set_mode( ModeKeyboardAction, ModeCursorKeys ),                                  "\e[2h\e[?1h",     'mixed ANSI and DEC modes';
+    is set_mode( ModeKeyboardAction, ModeInsertReplace, ModeCursorKeys, ModeAutoWrap ), "\e[2;4h\e[?1;7h", 'multiple mixed ANSI and DEC modes';
 };
-subtest 'TestResetMode' => sub {
-    my @tests = (
-        [ 'empty modes',              [],                                                                    '' ],
-        [ 'single ANSI mode',         [Cancer::Ansi::ModeKeyboardAction],                                    "\e[2l" ],
-        [ 'single DEC mode',          [Cancer::Ansi::ModeCursorKeys],                                        "\e[?1l" ],
-        [ 'multiple ANSI modes',      [ Cancer::Ansi::ModeKeyboardAction, Cancer::Ansi::ModeInsertReplace ], "\e[2;4l" ],
-        [ 'multiple DEC modes',       [ Cancer::Ansi::ModeCursorKeys, Cancer::Ansi::ModeAutoWrap ],          "\e[?1;7l" ],
-        [ 'mixed ANSI and DEC modes', [ Cancer::Ansi::ModeKeyboardAction, Cancer::Ansi::ModeCursorKeys ],    "\e[2l\e[?1l" ],
-        [   'multiple mixed ANSI and DEC modes',
-            [ Cancer::Ansi::ModeKeyboardAction, Cancer::Ansi::ModeInsertReplace, Cancer::Ansi::ModeCursorKeys, Cancer::Ansi::ModeAutoWrap ],
-            "\e[2;4l\e[?1;7l"
-        ],
-    );
-    for my $tc (@tests) {
-        my ( $name, $modes, $want ) = @$tc;
-        my $got = Cancer::Ansi::reset_mode(@$modes);
-        is $got, $want, $name;
-    }
+subtest reset_mode => sub {
+    is reset_mode(),                                                                      '',                'empty modes';
+    is reset_mode(ModeKeyboardAction),                                                    "\e[2l",           'single ANSI mode';
+    is reset_mode(ModeCursorKeys),                                                        "\e[?1l",          'single DEC mode';
+    is reset_mode( ModeKeyboardAction, ModeInsertReplace ),                               "\e[2;4l",         'multiple ANSI modes';
+    is reset_mode( ModeCursorKeys, ModeAutoWrap ),                                        "\e[?1;7l",        'multiple DEC modes';
+    is reset_mode( ModeKeyboardAction, ModeCursorKeys ),                                  "\e[2l\e[?1l",     'mixed ANSI and DEC modes';
+    is reset_mode( ModeKeyboardAction, ModeInsertReplace, ModeCursorKeys, ModeAutoWrap ), "\e[2;4l\e[?1;7l", 'multiple mixed ANSI and DEC modes';
 };
-subtest 'TestRequestMode' => sub {
-    my @tests = ( [ 'ANSI mode', Cancer::Ansi::ModeKeyboardAction, "\e[2\$p" ], [ 'DEC mode', Cancer::Ansi::ModeCursorKeys, "\e[?1\$p" ], );
-    for my $tc (@tests) {
-        my ( $name, $mode, $want ) = @$tc;
-        my $got = Cancer::Ansi::request_mode($mode);
-        is $got, $want, $name;
-    }
+subtest request_mode => sub {
+    is request_mode(ModeKeyboardAction), "\e[2\$p",  'ANSI mode';
+    is request_mode(ModeCursorKeys),     "\e[?1\$p", 'DEC mode';
 };
-subtest 'TestReportMode' => sub {
-    my @tests = (
-        [ 'ANSI mode not recognized',                        Cancer::Ansi::ModeKeyboardAction, Cancer::Ansi::ModeNotRecognized,    "\e[2;0\$y" ],
-        [ 'DEC mode set',                                    Cancer::Ansi::ModeCursorKeys,     Cancer::Ansi::ModeSet,              "\e[?1;1\$y" ],
-        [ 'ANSI mode reset',                                 Cancer::Ansi::ModeInsertReplace,  Cancer::Ansi::ModeReset,            "\e[4;2\$y" ],
-        [ 'DEC mode permanently set',                        Cancer::Ansi::ModeAutoWrap,       Cancer::Ansi::ModePermanentlySet,   "\e[?7;3\$y" ],
-        [ 'ANSI mode permanently reset',                     Cancer::Ansi::ModeSendReceive,    Cancer::Ansi::ModePermanentlyReset, "\e[12;4\$y" ],
-        [ 'Invalid mode setting defaults to not recognized', Cancer::Ansi::ModeKeyboardAction, 5,                                  "\e[2;0\$y" ],
-    );
-    for my $tc (@tests) {
-        my ( $name, $mode, $val, $want ) = @$tc;
-        my $got = Cancer::Ansi::report_mode( $mode, $val );
-        is $got, $want, $name;
-    }
+subtest report_mode => sub {
+    is report_mode( ModeKeyboardAction, ModeNotRecognized ),    "\e[2;0\$y",  'ANSI mode not recognized';
+    is report_mode( ModeCursorKeys,     ModeSet ),              "\e[?1;1\$y", 'DEC mode set';
+    is report_mode( ModeInsertReplace,  ModeReset ),            "\e[4;2\$y",  'ANSI mode reset';
+    is report_mode( ModeAutoWrap,       ModePermanentlySet ),   "\e[?7;3\$y", 'DEC mode permanently set';
+    is report_mode( ModeSendReceive,    ModePermanentlyReset ), "\e[12;4\$y", 'ANSI mode permanently reset';
+    is report_mode( ModeKeyboardAction, 5 ),                    "\e[2;0\$y",  'Invalid mode setting defaults to not recognized';
 };
-subtest 'TestModeImplementations' => sub {
-    is Cancer::Ansi::mode_num(Cancer::Ansi::ModeKeyboardAction), 2, 'ANSIMode(42)';
-    is Cancer::Ansi::mode_is_dec(Cancer::Ansi::ModeCursorKeys),  1, 'DECMode(99) is DEC';
-    is Cancer::Ansi::mode_num(Cancer::Ansi::ModeCursorKeys),     1, 'DECMode(99) mode num';
+subtest 'test mode implementations' => sub {
+    is mode_num(ModeKeyboardAction), 2, 'ANSIMode(42)';
+    is mode_is_dec(ModeCursorKeys),  1, 'DECMode(99) is DEC';
+    is mode_num(ModeCursorKeys),     1, 'DECMode(99) mode num';
 };
+#
 done_testing;

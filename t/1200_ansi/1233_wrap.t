@@ -2,7 +2,9 @@ use v5.42;
 use experimental 'class';
 use utf8;
 use Test2::V1 -ipP;
+use blib;
 use Cancer::Util qw[hardwrap wordwrap wrap];
+#
 my @hcases = (
     [ 'empty string',  '',               0, 1, '' ],
     [ 'passthrough',   "foobar\n ",      0, 1, "foobar\n " ],
@@ -17,7 +19,7 @@ my @hcases = (
     [ 'emoji',  "foo\x{1FAE7}foobar", 4, 0, "foo\n\x{1FAE7}fo\nobar" ],
     [ 'column', 'VERTICAL',           1, 0, "V\nE\nR\nT\nI\nC\nA\nL" ]
 );
-subtest 'TestHardwrap' => sub {
+subtest hardwrap => sub {
     for my $c (@hcases) {
         my ( $name, $input, $limit, $preserve, $expected ) = @$c;
         is hardwrap( $input, $limit, $preserve ), $expected, "hardwrap $name" or diag "input: $input";
@@ -40,7 +42,7 @@ my @wwcases = (
         3, '', "\e[38;2;249;38;114m(\e[0m\e[38;2;248;248;242mjust\nanother\ntest\e[38;2;249;38;114m)\e[0m"
     ]
 );
-subtest 'TestWordwrap' => sub {
+subtest wordwrap => sub {
     for my $c (@wwcases) {
         my ( $name, $input, $limit, $breaks, $expected ) = @$c;
         is wordwrap( $input, $limit, $breaks ), $expected, "wordwrap $name" or diag "input: $input";
@@ -59,10 +61,11 @@ my @wcases = (
     [ 'tab',          "foo\tbar",       3, "foo\nbar" ],
     [ 'exact',        "\e[91mfoo\e[0m", 3, "\e[91mfoo\e[0m" ]
 );
-subtest 'TestWrap' => sub {
+subtest wrap => sub {
     for my $c (@wcases) {
         my ( $name, $input, $width, $expected ) = @$c;
         is wrap( $input, $width, '' ), $expected, "wrap $name" or diag "input: $input";
     }
 };
+#
 done_testing;

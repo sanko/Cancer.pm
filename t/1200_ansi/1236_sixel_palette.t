@@ -5,10 +5,8 @@ use lib 'lib', '../lib';
 
 # Port of charmbracelet/x/ansi/sixel/palette_test.go
 # Inline median-cut color quantization + palette consistency tests.
-# -------------------------------------------------------------------
 # Helpers: sixelColor  (channels 0–100)
-# -------------------------------------------------------------------
-sub _sc ( $r, $g, $b, $a ) { bless { r => $r // 0, g => $g // 0, b => $b // 0, a => $a // 0 }, 'SixelColor' }
+sub _sc ( $r //= 0, $g //= 0, $b //= 0, $a //= 0 ) { bless { r => $r, g => $g, b => $b, a => $a }, 'SixelColor' }
 
 package SixelColor {
     use v5.42;
@@ -22,22 +20,16 @@ package SixelColor {
     sub stringify($s)    { sprintf '{R=%d G=%d B=%d A=%d}', $s->{r} // 0, $s->{g} // 0, $s->{b} // 0, $s->{a} // 0 }
 }
 
-# -------------------------------------------------------------------
 # Channel conversion  (0xffff → 0–100)
-# -------------------------------------------------------------------
-sub _convert_channel ($ch) {
-    return int( ( $ch + 328 ) * 100 / 0xffff );
-}
+sub _convert_channel ($ch) { int( ( $ch + 328 ) * 100 / 0xffff ) }
 
 sub _convert_color ( $r, $g, $b, $a ) {
 
     # RGBA.RGBA() in Go multiplies 8-bit by 257 to get 16-bit
-    SixelColor->new( _convert_channel( $r * 257 ), _convert_channel( $g * 257 ), _convert_channel( $b * 257 ), _convert_channel( $a * 257 ), );
+    SixelColor->new( _convert_channel( $r * 257 ), _convert_channel( $g * 257 ), _convert_channel( $b * 257 ), _convert_channel( $a * 257 ) );
 }
 
-# -------------------------------------------------------------------
 # Quantization cube
-# -------------------------------------------------------------------
 package QCube {
     use v5.42;
     sub new( $c, %args ) { bless { start => 0, len => 0, ch => 'r', score => 0, pixels => 0, %args }, $c }
@@ -48,10 +40,7 @@ package QCube {
     sub pixels($s)       { $s->{pixels} // 0 }
 }
 
-# -------------------------------------------------------------------
-# Priority queue (max-heap by score).  We keep an array and always
-# pop the highest-score cube.  Insertion maintains sorted-by-score.
-# -------------------------------------------------------------------
+# Priority queue (max-heap by score). We keep an array and always pop the highest-score cube. Insertion maintains sorted-by-score.
 package CubeHeap {
     use v5.42;
     sub new($c) { bless [], $c }
@@ -78,9 +67,7 @@ package CubeHeap {
     sub len($h) { scalar @$h }
 }
 
-# -------------------------------------------------------------------
 # Median-cut quantization
-# -------------------------------------------------------------------
 sub _create_cube ( $colors, $pixel_counts, $start, $len ) {
     my ( $min_r, $min_g, $min_b, $min_a ) = (0xffffffff) x 4;
     my ( $max_r, $max_g, $max_b, $max_a ) = (0) x 4;
@@ -132,9 +119,7 @@ sub _load_color ( $colors, $pixel_counts, $start, $len ) {
 }
 
 sub _quantize ( $colors, $pixel_counts, $max_colors ) {
-    if ( @$colors <= $max_colors ) {
-        return [ map { $_->clone } @$colors ];
-    }
+    return [ map { $_->clone } @$colors ] if @$colors <= $max_colors;
     my $heap = CubeHeap->new;
     $heap->push( _create_cube( $colors, $pixel_counts, 0, scalar @$colors ) );
     while ( $heap->len < $max_colors ) {
@@ -173,9 +158,7 @@ sub _quantize ( $colors, $pixel_counts, $max_colors ) {
     return \@palette;
 }
 
-# -------------------------------------------------------------------
 # new_sixel_palette — public entry point
-# -------------------------------------------------------------------
 sub _new_sixel_palette ( $img, $max_colors ) {
     my @pixels;
     for my $y ( 0 .. $img->{h} - 1 ) {
@@ -217,9 +200,7 @@ sub _new_sixel_palette ( $img, $max_colors ) {
     return { palette => $palette, convert => \%color_convert, indexes => \%palette_indexes, };
 }
 
-# -------------------------------------------------------------------
 # Test helpers
-# -------------------------------------------------------------------
 sub _make_img ( $w, $h, $pixels ) {
     my @data;
     for my $y ( 0 .. $h - 1 ) {
@@ -242,22 +223,20 @@ sub _sc_in ( $c, $list ) {
     return 0;
 }
 
-# -------------------------------------------------------------------
 # Tests
-# -------------------------------------------------------------------
-subtest 'TestPaletteCreationRedGreen' => sub {
+subtest 'Palette creation red green' => sub {
     my $img = _make_img(
         2, 2,
         [   [ 255, 0,   0, 255 ],    # (0,0) red
             [ 128, 0,   0, 255 ],    # (0,1) dark red
             [ 0,   255, 0, 255 ],    # (1,0) green
-            [ 0,   128, 0, 255 ],    # (1,1) dark green
+            [ 0,   128, 0, 255 ]     # (1,1) dark green
         ]
     );
     my $expected_palettes = {
-        'way too many colors'             => [ _sc( 100, 0, 0, 100 ), _sc( 50, 0, 0, 100 ), _sc( 0, 100, 0, 100 ), _sc( 0, 50, 0, 100 ), ],
-        'just the right number of colors' => [ _sc( 100, 0, 0, 100 ), _sc( 50, 0, 0, 100 ), _sc( 0, 100, 0, 100 ), _sc( 0, 50, 0, 100 ), ],
-        'color reduction'                 => [ _sc( 75, 0, 0, 100 ), _sc( 0, 75, 0, 100 ), ],
+        'way too many colors'             => [ _sc( 100, 0, 0, 100 ), _sc( 50, 0, 0, 100 ), _sc( 0, 100, 0, 100 ), _sc( 0, 50, 0, 100 ) ],
+        'just the right number of colors' => [ _sc( 100, 0, 0, 100 ), _sc( 50, 0, 0, 100 ), _sc( 0, 100, 0, 100 ), _sc( 0, 50, 0, 100 ) ],
+        'color reduction'                 => [ _sc( 75, 0, 0, 100 ), _sc( 0, 75, 0, 100 ) ]
     };
     for my $name ( sort keys %$expected_palettes ) {
         my $expect   = $expected_palettes->{$name};
@@ -278,18 +257,18 @@ subtest 'TestPaletteCreationRedGreen' => sub {
         }
     }
 };
-subtest 'TestPaletteWithSemiTransparency' => sub {
+subtest 'Palette with semi-transparency' => sub {
     my $img = _make_img(
         2, 2,
         [   [ 0, 0, 255, 255 ],    # (0,0) blue
             [ 0, 0, 128, 255 ],    # (0,1) dark blue
             [ 0, 0, 255, 128 ],    # (1,0) semi-transparent blue
-            [ 0, 0, 255, 0 ],      # (1,1) fully transparent blue
+            [ 0, 0, 255, 0 ]       # (1,1) fully transparent blue
         ]
     );
     my $expected = {
-        'just the right number of colors' => [ _sc( 0, 0, 100, 100 ), _sc( 0, 0, 50,  100 ), _sc( 0, 0, 100, 50 ), _sc( 0, 0, 100, 0 ), ],
-        'color reduction'                 => [ _sc( 0, 0, 75,  100 ), _sc( 0, 0, 100, 25 ), ],
+        'just the right number of colors' => [ _sc( 0, 0, 100, 100 ), _sc( 0, 0, 50,  100 ), _sc( 0, 0, 100, 50 ), _sc( 0, 0, 100, 0 ) ],
+        'color reduction'                 => [ _sc( 0, 0, 75,  100 ), _sc( 0, 0, 100, 25 ) ]
     };
     for my $name ( sort keys %$expected ) {
         my $expect = $expected->{$name};
@@ -309,4 +288,5 @@ subtest 'TestPaletteWithSemiTransparency' => sub {
         }
     }
 };
+#
 done_testing;

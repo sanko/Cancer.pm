@@ -2,27 +2,15 @@ use v5.42;
 use experimental 'class';
 use Test2::V1 -ipP;
 use lib 'lib', '../lib';
-use Encode               qw(encode);
-use Cancer::Ansi::Parser qw(
-    new_parser set_handler set_params_size parser_parse
+use Encode qw[encode];
+use blib;
+use Cancer::Ansi::Parser qw[new_parser set_handler set_params_size parser_parse
     Final Intermediate Prefix
-    MissingParam
-);
-subtest 'TestDcsSequence' => sub {
-    my @dispatched;
-    my $p = new_parser();
-    set_params_size( $p, 16 );
-    set_handler(
-        $p,
-        {   HandleDcs => sub ( $cmd, $params, $data ) { push @dispatched, { dcs => $cmd, params => [@$params], data => $data } },
-            HandleEsc => sub ($cmd) { push @dispatched, { esc => $cmd } },
-            HandleCsi => sub ( $cmd, $params ) { push @dispatched, { csi => $cmd, params => [@$params] } },
-        }
-    );
-
-    # -- max_params: "\eP" + "1;"x33 + "p\e\\"
-    @dispatched = ();
-    $p          = new_parser();
+    MissingParam];
+#
+subtest max_params => sub {
+    my @dispatched = ();
+    my $p          = new_parser();
     set_params_size( $p, 16 );
     set_handler(
         $p,
@@ -38,10 +26,10 @@ subtest 'TestDcsSequence' => sub {
     is $dispatched[0]{params}[15],           1,         'max_params: param[15]=1';
     is $dispatched[0]{data},                 '',        'max_params: empty data';
     is Final( $dispatched[1]{esc} ),         ord('\\'), 'max_params: esc cmd';
-
-    # -- reset: "\e[3;1\eP1$tx\x9c" (CSI discarded, DCS with intermed and ST)
-    @dispatched = ();
-    $p          = new_parser();
+};
+subtest 'reset: "\e[3;1\eP1$tx\x9c" (CSI discarded, DCS with intermed and ST)' => sub {
+    my @dispatched = ();
+    my $p          = new_parser();
     set_params_size( $p, 16 );
     set_handler(
         $p,
@@ -55,10 +43,10 @@ subtest 'TestDcsSequence' => sub {
     is Intermediate( $dispatched[0]{dcs} ), ord('$'), 'reset: dcs intermediate byte';
     is $dispatched[0]{params}[0],           1,        'reset: param[0]=1';
     is $dispatched[0]{data},                'x',      'reset: data=x';
-
-    # -- parse: "\eP0;1|17/ab\x9c"
-    @dispatched = ();
-    $p          = new_parser();
+};
+subtest 'parse: "\eP0;1|17/ab\x9c"' => sub {
+    my @dispatched = ();
+    my $p          = new_parser();
     set_params_size( $p, 16 );
     set_handler( $p, { HandleDcs => sub ( $cmd, $params, $data ) { push @dispatched, { dcs => $cmd, params => [@$params], data => $data } }, } );
     parser_parse( $p, "\eP0;1|17/ab\x9c" );
@@ -67,10 +55,10 @@ subtest 'TestDcsSequence' => sub {
     is $dispatched[0]{params}[1],            1,        'parse: param[1]=1';
     is Final( $dispatched[0]{dcs} ),         ord('|'), 'parse: dcs final byte';
     is $dispatched[0]{data},                 '17/ab',  'parse: data';
-
-    # -- intermediate_reset_on_exit: "\eP=1sZZZ\e+\x5c"
-    @dispatched = ();
-    $p          = new_parser();
+};
+subtest intermediate_reset_on_exit => sub {
+    my @dispatched = ();
+    my $p          = new_parser();
     set_params_size( $p, 16 );
     set_handler(
         $p,
@@ -86,10 +74,10 @@ subtest 'TestDcsSequence' => sub {
     is $dispatched[0]{data},                       'ZZZ',    'intermediate_reset: dcs data';
     is Final( $dispatched[1]{esc} ),               0x5c,     'intermediate_reset: esc final byte';
     is chr( Intermediate( $dispatched[1]{esc} ) ), '+',      'intermediate_reset: esc intermediate byte';
-
-    # -- put_utf8: "\eP+r😃\e\\"
-    @dispatched = ();
-    $p          = new_parser();
+};
+subtest put_utf8 => sub {
+    my @dispatched = ();
+    my $p          = new_parser();
     set_params_size( $p, 16 );
     set_handler(
         $p,
@@ -107,4 +95,5 @@ subtest 'TestDcsSequence' => sub {
     is scalar( $dispatched[0]{params}->@* ),       0,            'put_utf8: no params';
     is Final( $dispatched[1]{esc} ),               ord('\\'),    'put_utf8: esc cmd';
 };
+#
 done_testing;

@@ -1,6 +1,7 @@
 use v5.42;
 use experimental 'class';
 use utf8;
+use blib;
 use Test2::V1 -ipP;
 use Cancer::Util qw[truncate truncate_left cut byte_to_grapheme_range];
 
@@ -28,7 +29,7 @@ my @tcases = (
         "\x{2026}",                               7,
         "\e[38;5;219mHiya!\e[38;5;219mH\x{2026}", "\e[38;5;219m\e[38;5;219m\x{2026}llo"
     ],
-    [ 'truncate_with_tail', 'foobar', '.', 4, 'foo.', '.ar' ],
+    [ 'truncate_with_tail', 'foobar', '.', 4, 'foo.', '.ar' ]
 );
 subtest 'TestTruncate' => sub {
     for my $c (@tcases) {
@@ -65,7 +66,7 @@ subtest 'TestByteToGraphemeRange' => sub {
         [ 'simple',     'hello world from x/ansi', [  2, 9 ],  [ 2, 9 ] ],
         [ 'with emoji', "\x{e718} Downloads",      [  4, 7 ],  [ 2, 5 ] ],
         [ 'start ob',   'some text',               [ -1, 5 ],  [ 0, 5 ] ],
-        [ 'end ob',     'some text',               [  1, 50 ], [ 1, 9 ] ],
+        [ 'end ob',     'some text',               [  1, 50 ], [ 1, 9 ] ]
     );
     for my $c (@gb_cases) {
         my ( $name, $input, $feed, $expect ) = @$c;
@@ -74,4 +75,5 @@ subtest 'TestByteToGraphemeRange' => sub {
         is $got_stop,  $expect->[1], "byte_to_grapheme_range $name stop";
     }
 };
+#
 done_testing;

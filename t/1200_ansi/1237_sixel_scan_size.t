@@ -2,9 +2,10 @@ use v5.42;
 use experimental 'class';
 use Test2::V1 -ipP;
 use lib 'lib', '../lib';
+use blib;
 
 # Port of TestScanSize from charmbracelet/x/ansi/sixel/sixel_test.go
-use Cancer::Ansi::Sixel qw(DecodeRepeat);
+use Cancer::Ansi::Sixel qw[DecodeRepeat];
 use constant LINE_BREAK        => ord('-');
 use constant CARRIAGE_RETURN   => ord('$');
 use constant REPEAT_INTRODUCER => ord('!');
@@ -52,7 +53,7 @@ subtest 'TestScanSize' => sub {
         { name => 'smaller carriage returns',    data => '~$~~$~~~$~~~~$~~~~~$~~~~~~',                                 want_w => 6,  want_h => 6 },
         { name => 'transparent',                 data => "??????",                                                     want_w => 6,  want_h => 6 },
         { name => 'RLE',                         data => "??!20?",                                                     want_w => 22, want_h => 6 },
-        { name => 'Colors',                      data => "#0;2;0;0;0~~~~~\$#1;2;100;100;100;~~~~~~-#0~~~~~~-#1~~~~~~", want_w => 6,  want_h => 18 },
+        { name => 'Colors',                      data => "#0;2;0;0;0~~~~~\$#1;2;100;100;100;~~~~~~-#0~~~~~~-#1~~~~~~", want_w => 6,  want_h => 18 }
     );
     for my $tt (@tests) {
         my ( $w, $h ) = _scanSize( $tt->{data} );
@@ -60,4 +61,5 @@ subtest 'TestScanSize' => sub {
         is $h, $tt->{want_h}, "$tt->{name} height";
     }
 };
+#
 done_testing;

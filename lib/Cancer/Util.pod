@@ -1,0 +1,158 @@
+=head1 NAME
+
+Cancer::Util - String width, truncation, and wrapping utilities
+
+=head1 SYNOPSIS
+
+    use Cancer::Util qw[ visual_width truncate wordwrap go_duration ];
+
+    say visual_width("hello");         # 5
+    say truncate( $long_string, 20 );  # "a very long str..."
+    say wordwrap( $paragraph, 40 );
+
+=head1 DESCRIPTION
+
+B<Cancer::Util> is the framework's grab-bag of pure string functions, all modeled on Go's Bubble Tea/muesli helpers. It
+measures the I<visual> width of strings (Unicode aware, using East Asian wide and zero-width character tables),
+truncates strings to a width while preserving ANSI styling, wraps text at a column limit, converts seconds into
+Go-style duration strings, and translates byte offsets into grapheme indexes.
+
+Widths are computed from two internal tables: C<@zero_ranges> (combining marks, zero-width joiners, variation
+selectors, bidi controls, and the like, which occupy no columns) and C<@wide_ranges> (East Asian Wide/Fullwidth
+codepoints, emoji, Hangul Jamo, and the misc symbol blocks that occupy two columns). Every other character counts as
+one column, and combining sequences are treated as single graphemes.
+
+=head1 FUNCTIONS
+
+All functions are exported on request.
+
+=head2 C<visual_width( $str )>
+
+Returns the number of terminal columns C<$str> occupies, accounting for wide and zero-width characters. ANSI escape
+sequences count as zero width.
+
+=head2 C<grapheme_width( $str )>
+
+Width of C<$str> treating combining sequences as single graphemes. Returns a single integer: the number of terminal
+columns the string occupies.
+
+=head2 width ( $str )
+
+Width of the C<width> of the first line; the I<widest> line's width for multi-line strings. Also breaks ANSI sequences
+in a separate pass (a wrapper around C<_calc_width>).
+
+=head2 height ( $str )
+
+Returns the number of newline-delimited lines in C<$str> (empty string is 1).
+
+=head2 size ( $str )
+
+Returns C<( width($str), height($str) )>.
+
+=head2 string_width ( $str ) / string_width_wc ( $str )
+
+Aliases for the plain and grapheme-aware width calculations; C<string_width_wc> is a deprecated synonym of
+C<grapheme_width>.
+
+=head2 truncate ( $str, $width, $tail = '' )
+
+Returns C<$str> truncated to C<$width> columns, appending C<$tail> to the middle of the cut (Go's muesli/reflow
+C<truncate.StringWithTail>>), so styled and colored text stays balanced. Handles ANSI sequences, wide characters, and
+combining marks; C<undef> returns C<undef>.
+
+=head2 truncate_left ( $str, $width, $tail = '' )
+
+Same as C<truncate> but keeps the trailing C<$tail> text: the leading portion of the string is cut away so the visible
+text ends with the original tail.
+
+=head2 cut ( $str, $left, $right )
+
+Cuts C<$str> by visible columns, returning the substring between columns C<$left> and C<$right> (inclusive on the left,
+exclusive on the right). ANSI sequences are carried through and wide characters that straddle a boundary are skipped.
+
+=head2 ansi_cut ( $str, $width )
+
+Returns the first C<$width> visible columns of C<$str>, keeping any trailing ANSI escape sequences (even those that
+follow the cut point) so styled lines retain their trailing style segments. This mirrors Go's C<x/ansi Cut(s, 0,
+width)> behaviour.
+
+=head2 visual_truncate ( $str, $max_width )
+
+Truncates C<$str> to C<$max_width> visible columns for display (used for zone marker text), skipping ANSI escapes and
+wide/combining characters that would overflow.
+
+=head2 strip_ansi ( $str )
+
+Removes ANSI escape sequences from C<$str>, returning plain text. A cached regex-based approximation of muesli's
+C<ansi.Strip>.
+
+=head2 byte_to_grapheme_range ( $str, $byte_start, $byte_end )
+
+Converts a byte offset range (as used by the kitty cursor-position report and friends) into a grapheme index range,
+returning C<( $g_start, $g_end )>.
+
+=head2 go_duration ( $sec )
+
+Formats C<$sec> (seconds, possibly fractional) the way Go's C<time.Duration.String> does: C<'0s'>, C<'42ns'>,
+C<'3.141593E<181>s'>, C<'1m1s'>, C<'2h3m4.5s'>, with a C<-> prefix for negative values.
+
+=head2 hardwrap ( $str, $limit, $preserve_space = 0 )
+
+Wraps C<$str> to C<$limit> columns without breaking words (breaks at the last space; a word longer than the limit is
+kept on its own line). With C<$preserve_space>, trailing spaces are preserved on each wrapped line.
+
+=head2 wordwrap ( $str, $limit, $break_points = '' )
+
+Wraps C<$str> at the nearest space within C<$limit> columns; when no space is found it breaks mid-word (muesli's
+C<wordwrap.Wordwrap>), and words themselves can additionally be split at any of the characters given in
+C<$break_points>. ANSI sequences never count toward the limit.
+
+=head2 wrap ( $str, $width, $break_points = '' )
+
+A convenience wrapper combining C<hardwrap>-style long-word handling with C<$break_points>: returns C<$str> when
+C<$width> <= 0, otherwise the wrapped text.
+
+=head1 SEE ALSO
+
+=over
+
+=item * L<Cancer::Markdown> - uses C<wrap>/C<wordwrap> for its paragraph layout
+
+=item * L<Cancer::Component::TextArea> and the other text components that rely on
+C<visual_width>, C<truncate>, and C<wrap>
+
+=item * L<muesli/reflow|https://github.com/muesli/reflow> - the upstream Go wrapping and
+truncation library this module ports
+
+=item * L<muesli/termenv|https://github.com/muesli/termenv> - upstream of the width and ANSI
+handling
+
+=item * L<Unicode East Asian Width|https://www.unicode.org/reports/tr11/> - the property the
+wide-character tables are derived from
+
+=back
+
+The upstream cousin of this module is the combination of L<muesli/reflow|https://github.com/muesli/reflow>
+(truncate/wordwrap) and the width calculation in muesli's C<termenv> package; the exported function set is a faithful
+port, used across Cancer's layout and rendering.
+
+=head1 LICENSE
+
+This software is Copyright (c) 2020 by Sanko Robinson.
+
+This is free software, licensed under:
+
+  The Artistic License 2.0 (GPL Compatible)
+
+See the F<LICENSE> file for full text.
+
+=head1 AUTHOR
+
+Sanko Robinson  L<https://github.com/sanko>
+
+=begin stopwords
+
+
+=end stopwords
+
+=cut

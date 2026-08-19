@@ -1,0 +1,259 @@
+=head1 NAME
+
+Cancer::Ansi::Kitty - Constants and helpers for the kitty graphics protocol
+
+=head1 SYNOPSIS
+
+    use Cancer::Ansi::Kitty qw[TransmitAndPut Direct RGBA Zlib MaxChunkSize];
+    use Cancer::Ansi::Kitty::Encoder;
+
+    my $encoded = Cancer::Ansi::Kitty::Encoder->new(
+        format   => RGBA,
+        compress => 1
+    )->encode( $rgba_pixels, 40, 25 );
+
+    for ( my $i = 0; $i < length $encoded; $i += MaxChunkSize ) {
+        my $chunk = substr $encoded, $i, MaxChunkSize;
+        print "\e_G" . "a=$i," . "f=$TransmitAndPut," . 's=40,' . 'v=25,' . "c=$MaxChunkSize," . "t=$Direct," . "C=$Zlib," . "m=0;$chunk\e\\";
+    }
+
+=head1 DESCRIPTION
+
+B<Cancer::Ansi::Kitty> is a bag of constants and small helpers for building the control sequences of the I<kitty
+graphics protocol>, the inline image format that kitty (and other terminals such as WezTerm and foot) support. All
+values are constants exported on request; C<Diacritic> is a function and C<@diacritics> a package array.
+
+The protocol is fully covered by the constants in three groups:
+
+=over
+
+=item * Pixel formats - C<RGBA>, C<RGB>, C<PNG>.
+
+=item * Transmission media - C<Direct>, C<File>, C<TempFile>, C<SharedMemory>,
+plus the transmission actions C<Transmit>, C<TransmitAndPut>, C<Query>, C<Put>,
+and the compression flag C<Zlib>.
+
+=item * Action and delete verbs - C<Delete>, C<Frame>, C<Animate>, C<Compose>
+and the C<DeleteAll>, C<DeleteID>, C<DeleteNumber>, C<DeleteCursor>,
+C<DeleteFrames>, C<DeleteCell>, C<DeleteCellZ>, C<DeleteRange>, C<DeleteColumn>,
+C<DeleteRow>, and C<DeleteZ> flavours.
+
+=back
+
+L<Cancer::Ansi::Kitty::Encoder> and L<Cancer::Ansi::Kitty::Decoder> perform the actual pixel work; this module just
+supplies the vocabulary of the wire format.
+
+=head1 CONSTANTS
+
+=head2 protocol basics
+
+=over
+
+=item * C<MaxChunkSize> - The maximum number of payload bytes in a single
+transmission chunk, C<4096>.
+
+=item * C<Placeholder> - The private-use character C<\x{10EEEE}> used as a
+placeholder rune in some tooling.
+
+=back
+
+=head2 pixel formats
+
+=over
+
+=item * C<RGBA> - I<32>, a pixel format of one byte per channel plus alpha.
+
+=item * C<RGB> - I<24>, a pixel format of one byte per channel, no alpha.
+
+=item * C<PNG> - I<100>, a PNG-encoded image.
+
+=back
+
+=head2 transmission options
+
+=over
+
+=item * C<Zlib> - I<'z'>, the compression flag for zlib-compressed payloads.
+
+=item * C<Direct> - I<'d'>, transmission medium: direct payload inline
+in the escape sequence.
+
+=item * C<File> - I<'f'>, transmission medium: a named file on disk
+(via C<t=f>).
+
+=item * C<TempFile> - I<'t'>, transmission medium: a temporary file
+(via C<t=t>).
+
+=item * C<SharedMemory> - I<'s'>, transmission medium: shared memory
+segment (via C<t=s>).
+
+=item * C<Transmit> - I<'t'>, transmission action: send an image (C<a=t>).
+
+=item * C<TransmitAndPut> - I<'T'>, transmission action: send an image and
+place it (C<a=T>).
+
+=item * C<Query> - I<'q'>, transmission action: query terminal capability
+(C<a=q>).
+
+=item * C<Put> - I<'p'>, transmission action: place an already-transmitted
+image (C<a=p>).
+
+=back
+
+=head2 actions and delete selectors
+
+=over
+
+=item * C<Delete> - I<'d'>, the delete action.
+
+=item * C<Frame> - I<'f'>, the frame action.
+
+=item * C<Animate> - I<'a'>, the animate action.
+
+=item * C<Compose> - I<'c'>, the compose action.
+
+=item * C<DeleteAll> - I<'a'>, delete all images.
+
+=item * C<DeleteID> - I<'i'>, delete a specific image ID.
+
+=item * C<DeleteNumber> - I<'n'>, delete a number of images.
+
+=item * C<DeleteCursor> - I<'c'>, delete the image under the cursor.
+
+=item * C<DeleteFrames> - I<'f'>, delete animation frames.
+
+=item * C<DeleteCell> - I<'p'>, delete the cell under the cursor.
+
+=item * C<DeleteCellZ> - I<'q'>, delete the cell under the cursor (z-index
+variant).
+
+=item * C<DeleteRange> - I<'r'>, delete a range of cells.
+
+=item * C<DeleteColumn> - I<'x'>, delete a column.
+
+=item * C<DeleteRow> - I<'y'>, delete a row.
+
+=item * C<DeleteZ> - I<'z'>, delete by z-index.
+
+=back
+
+=head1 FUNCTIONS AND ARRAYS
+
+=head2 C<Diacritic( $i )>
+
+Returns the combining diacritical character at index C<$i> from the C<@diacritics> list. Out-of-range indexes (below
+C<0> or at or past the end of the array) return the first entry. These characters are the combining marks kitty uses
+when encoding text with base-characters in the keyboard protocol.
+
+=head2 C<@diacritics>
+
+The package array of combining diacritical marks used to synthesise base characters for kitty keyboard events. Not
+exported; refer to it as C<@Cancer::Ansi::Kitty::diacritics>.
+
+=head1 KEYBOARD PROTOCOL
+
+Constants and helpers for the I<kitty keyboard protocol>, the progressive enhancement scheme that lets terminals report
+disambiguated key events, modifiers, and associated keys. The functions below return raw CSI sequences ready to be
+printed to the terminal.
+
+=head2 C<KittyKeyboard( $flags, $mode )>
+
+Returns the CSI sequence to set or modify the kitty keyboard protocol flags. C<$flags> is a bitmask of
+C<KittyDisambiguateEscapeCodes>, C<KittyReportEventTypes>, C<KittyReportAlternateKeys>,
+C<KittyReportAllKeysAsEscapeCodes>, and C<KittyReportAssociatedKeys>. C<$mode> controls how flags are applied:
+
+=over
+
+=item * 0 - Set (replace all flags with C<$flags>)
+
+=item * 1 - Add (OR C<$flags> into current flags)
+
+=item * 2 - Remove (AND out C<$flags> from current flags)
+
+=item * 3 - Replace (same as set)
+
+=back
+
+=head2 C<PushKittyKeyboard( $flags )>
+
+Pushes the current keyboard protocol state onto the stack and optionally sets new flags. When C<$flags> is zero or
+omitted, only the push operation is performed; otherwise the new flags are applied immediately after the push.
+
+=head2 C<PopKittyKeyboard( $n )>
+
+Pops C<$n> (default 1) saved keyboard states from the stack, restoring the most recent saved state.
+
+=head2 Constants
+
+=over
+
+=item * C<KittyDisambiguateEscapeCodes> - I<1>, report distinctly which key was pressed rather than merging escape
+codes that look alike.
+
+=item * C<KittyReportEventTypes> - I<2>, report key down, repeat, and key up events separately.
+
+=item * C<KittyReportAlternateKeys> - I<4>, when a key has alternate forms (e.g.\ shift variants), report which one
+was held.
+
+=item * C<KittyReportAllKeysAsEscapeCodes> - I<8>, encode every key press as an escape code rather than falling back
+to Unicode text for printable characters.
+
+=item * C<KittyReportAssociatedKeys> - I<16>, report keys that are logically associated with the pressed key (e.g.\
+modifier keys on keyboard layouts that encode them separately).
+
+=item * C<KittyAllFlags> - I<31>, the bitwise OR of all five flags above (C<1|2|4|8|16>).
+
+=item * C<RequestKittyKeyboard> - I<CSI ?u>, query the terminal for its current kitty keyboard protocol flags.
+
+=item * C<DisableKittyKeyboard> - I<CSI >u>, disable the kitty keyboard protocol entirely and revert to the default
+terminal behaviour.
+
+=back
+
+=head1 SEE ALSO
+
+=over
+
+=item * L<Cancer::Ansi::Kitty::Encoder> - Serialises pixel data into the
+payloads this module describes.
+
+=item * L<Cancer::Ansi::Kitty::Decoder> - Parses kitty image payloads back
+into raw pixels.
+
+=item * L<Cancer::Ansi::Sixel> - The DEC sixel image format, also supported.
+
+=item * L<Cancer::Ansi::Iterm2> - The iTerm2 inline image protocol.
+
+=item * L<Cancer::Ansi::Parser> - Parses the escape sequences terminals send
+back.
+
+=item * L<Kitty Keyboard Protocol|https://sw.kovidgoyal.net/kitty/keyboard-protocol/> - The upstream specification for
+the progressive keyboard enhancement this module implements.
+
+=back
+
+The upstream cousin of this module is the kitty graphics protocol support in Bubble Tea's I<x/term> and in
+L<charmbracelet/vhs|https://github.com/charmbracelet/vhs>. The protocol itself is specified at L<kitty graphics
+protocol|https://sw.kovidgoyal.net/kitty/graphics-protocol/>, and the enclosing escape syntax at L<ANSI escape
+code|https://en.wikipedia.org/wiki/ANSI_escape_code>.
+
+=head1 LICENSE
+
+This software is Copyright (c) 2020 by Sanko Robinson.
+
+This is free software, licensed under:
+
+  The Artistic License 2.0 (GPL Compatible)
+
+See the F<LICENSE> file for full text.
+
+=head1 AUTHOR
+
+Sanko Robinson  L<https://github.com/sanko>
+
+=begin stopwords
+
+
+=end stopwords
+
+=cut

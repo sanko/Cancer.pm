@@ -4,18 +4,18 @@ Cancer::Ansi - Build raw ANSI/VT escape sequences for terminal control
 
 =head1 SYNOPSIS
 
-    use Cancer::Ansi qw(
+    use Cancer::Ansi qw[
         set_window_title set_clipboard ShowCursor
         set_mode reset_mode ModeAltScreen
-        SelectGraphicRendition AttrBold
+        SGR AttrBold
         set_foreground_color convert_256
-    );
+    ];
 
     print set_window_title('My App');            # \e]2;My App\a
     print set_system_clipboard('copied');        # \e]52;c;Y29waWVk\a
     print ShowCursor;                            # \e[?25h
     print set_mode( ModeAltScreen, ModeMouseNormal );
-    print SelectGraphicRendition( AttrBold, 31 );    # \e[1;31m
+    print SGR( AttrBold, 31 );    # \e[1;31m
     print set_foreground_color( convert_256( 0xFF8C00 ) );
 
 =head1 DESCRIPTION
@@ -25,7 +25,7 @@ sequences. It is the low-level "sequence builder" that every higher layer (L<Can
 L<Cancer::Style>) uses to talk to a terminal. Nothing here talks to a terminal directly; each exported function merely
 returns the byte string that C<write>ing to a terminal (or a L<Cancer::Terminal> implementation) would produce.
 
-Every exported symbol is pulled in explicitly via C<use Cancer::Ansi qw(...)>; nothing is exported by default.
+Every exported symbol is pulled in explicitly via C<use Cancer::Ansi qw[...]>; nothing is exported by default.
 
 The module mirrors the escape-sequence builders found in Go's terminal ecosystem, most directly
 C<github.com/charmbracelet/x/ansi>, and encodes the same control sequences defined by the ECMA-48 / ANSI X3.64 standard
@@ -33,66 +33,69 @@ and the private DEC, kitty, and xterm extensions.
 
 =head1 COLOR (OSC 10-12)
 
-=head2 set_foreground_color ( $color )
+=head2 C<set_foreground_color( $color )>
 
 Returns the OSC 10 sequence C<\e]10;$color\a> that sets the terminal's default foreground color. C<$color> is typically
 a hex string like C<#ff8c00>.
 
-=head2 set_background_color ( $color )
+=head2 C<set_background_color( $color )>
 
 Returns C<\e]11;$color\a> to set the default background color.
 
-=head2 set_cursor_color ( $color )
+=head2 C<set_cursor_color( $color )>
 
 Returns C<\e]12;$color\a> to set the text cursor color.
 
-=head2 request_foreground_color ()
+=head2 C<request_foreground_color( )>
 
 Returns C<\e]10;?\a>; the terminal answers with a color report on the input stream.
 
-=head2 request_background_color ()
+=head2 C<request_background_color( )>
 
 Returns C<\e]11;?\a>.
 
-=head2 request_cursor_color ()
+=head2 C<request_cursor_color( )>
 
 Returns C<\e]12;?\a>.
 
-=head2 reset_foreground_color ()
+=head2 C<reset_foreground_color( )>
 
 Returns C<\e]110\a> to restore the terminal's default foreground.
 
-=head2 reset_background_color ()
+=head2 C<reset_background_color( )>
 
 Returns C<\e]111\a>.
 
-=head2 reset_cursor_color ()
+=head2 C<reset_cursor_color( )>
 
 Returns C<\e]112\a>.
 
 =head1 CLIPBOARD (OSC 52)
 
-=head2 set_clipboard ( $channel, $data )
+=head2 C<set_clipboard( $channel, $data )>
 
 Returns the OSC 52 sequence C<\e]52;$channel;$data\a> that writes C<$data> to the clipboard selected by C<$channel>
 (see C<SYSTEM_CLIPBOARD> and C<PRIMARY_CLIPBOARD> below). Non-empty data is base64-encoded with MIME::Base64 before
 being embedded.
 
-=head2 set_system_clipboard ( $data ) / set_primary_clipboard ( $data )
+=head2 C<set_system_clipboard( $data )>
 
-Convenience wrappers that set the system (C<c>) or primary selection (C<p>) clipboard, respectively.
-C<set_system_clipboard> delegates to C<set_clipboard( SYSTEM_CLIPBOARD, $data )>.
+Convenience wrapper that sets the system (C<c>) clipboard.
 
-=head2 reset_clipboard ( $channel )
+=head2 C<set_primary_clipboard( $data )>
+
+Convenience wrapper that sets the primary selection (C<p>) clipboard.
+
+=head2 C<reset_clipboard( $channel )>
 
 Empties the given clipboard channel via C<set_clipboard( $channel, '' )>.
 
-=head2 request_clipboard ( $channel )
+=head2 C<request_clipboard( $channel )>
 
 Returns C<\e]52;$channel;?\a>, requesting that the terminal paste the current clipboard contents as a response on the
 input stream.
 
-=over 4
+=over
 
 =item * C<SYSTEM_CLIPBOARD>
 
@@ -122,47 +125,47 @@ Pre-built sequence C<\e]52;p;?\a> that requests the primary clipboard.
 
 =head1 HYPERLINKS (OSC 8)
 
-=head2 set_hyperlink ( $uri, @params )
+=head2 C<set_hyperlink( $uri, @params )>
 
 Returns the OSC 8 hyperlink sequence C<\e]8;$params;$uri\a>. C<@params> are extra semicolon-separated parameters (for
 example C<id:foo>) and are only emitted when present.
 
-=head2 reset_hyperlink ( @params )
+=head2 C<reset_hyperlink( @params )>
 
 Clears the active hyperlink by calling C<set_hyperlink( '', @params )>.
 
 =head1 WINDOW TITLE (OSC 0-2)
 
-=head2 set_icon_name_window_title ( $text )
+=head2 C<set_icon_name_window_title( $text )>
 
 Returns C<\e]0;$text\a> setting both the icon name and window title.
 
-=head2 set_icon_name ( $text )
+=head2 C<set_icon_name( $text )>
 
 Returns C<\e]1;$text\a> setting only the icon name.
 
-=head2 set_window_title ( $text )
+=head2 C<set_window_title( $text )>
 
 Returns C<\e]2;$text\a> setting only the window title.
 
-=head2 decswt ( $name )
+=head2 C<decswt( $name )>
 
 Returns C<\e]2;1;$name\a>; the DEC conformant (VT420) window title form.
 
-=head2 decsin ( $name )
+=head2 C<decsin( $name )>
 
 Returns C<\e]2;L;$name\a>; the DEC conformant session name form.
 
 =head1 WORKING DIRECTORY (OSC 7)
 
-=head2 notify_working_directory ( $host, @paths )
+=head2 C<notify_working_directory( $host, @paths )>
 
 Returns C<\e]7;file://$host/path1/path2\a> which tells the terminal the current working directory so it can offer the
 path in file dialogs or a "open here" action.
 
 =head1 GRAPHICS (kitty)
 
-=head2 kitty_graphics ( $payload, @opts )
+=head2 C<kitty_graphics( $payload, @opts )>
 
 Returns a kitty graphics protocol frame C<\e_GE<lt>optsE<gt>;<payload>\e\\>. C<@opts> are comma-joined into the
 protocol's options string (e.g. C<q=2>, C<a=T>); an empty payload omits the terminating semicolon. See L<the kitty
@@ -174,26 +177,26 @@ Terminal modes are represented internally as C<[ number, is_dec ]> pairs: C<is_d
 (emitted with a C<?> prefix), false for ANSI modes. The constants below are such pairs; shorthand aliases are listed
 after each full name.
 
-=head2 set_mode ( @modes )
+=head2 C<set_mode( @modes )>
 
 Returns a C<SM> (Set Mode, C<\e[..h>) sequence enabling each given mode. ANSI and DEC modes are batched into their own
 sequences. Returns the empty string when no modes are given.
 
-=head2 reset_mode ( @modes )
+=head2 C<reset_mode( @modes )>
 
 Returns an C<RM> (Reset Mode, C<\e[..l>) sequence disabling each given mode.
 
-=head2 request_mode ( $mode )
+=head2 C<request_mode( $mode )>
 
 Returns the DECRQM request sequence C<\e[?N$p> (or C<\e[N$p> for ANSI modes); the terminal replies with a C<\e[?N;M$y>
 report which can be parsed with C<report_mode>.
 
-=head2 report_mode ( $mode, $value )
+=head2 C<report_mode( $mode, $value )>
 
 Returns the DECRPM report sequence C<\e[?N;M$y> for a value in the range 0-4 (values outside the range are clamped to
 C<ModeNotRecognized>). See the mode-state constants below.
 
-=over 4
+=over
 
 =item * C<ModeNotRecognized> - 0
 
@@ -207,22 +210,37 @@ C<ModeNotRecognized>). See the mode-state constants below.
 
 =back
 
-=head2 mode_is_not_recognized ( $m ) / mode_is_set ( $m ) / mode_is_reset ( $m ) / mode_is_permanently_set ( $m ) / mode_is_permanently_reset ( $m )
+=head2 C<mode_is_not_recognized( $m )>
 
-Predicate helpers that answer whether a reported mode state matches a given classification. C<mode_is_set> also accepts
-C<ModePermanentlySet>, and C<mode_is_reset> also accepts C<ModePermanentlyReset>.
+Returns true if the mode was not recognized by the terminal.
 
-=head2 mode_is_dec ( $m )
+=head2 C<mode_is_set( $m )>
+
+Returns true if the mode is currently set (in the reported response).
+
+=head2 C<mode_is_reset( $m )>
+
+Returns true if the mode is currently reset (in the reported response).
+
+=head2 C<mode_is_permanently_set( $m )>
+
+Returns true if the mode is permanently set.
+
+=head2 C<mode_is_permanently_reset( $m )>
+
+Returns true if the mode is permanently reset.
+
+=head2 C<mode_is_dec( $m )>
 
 Returns true if the mode is a DEC private mode (will be emitted with a C<?> prefix).
 
-=head2 mode_num ( $m )
+=head2 C<mode_num( $m )>
 
 Returns the numeric identifier of the mode.
 
 =head2 ANSI mode constants
 
-=over 4
+=over
 
 =item * C<ModeKeyboardAction> / C<KAM> - 2
 
@@ -238,7 +256,7 @@ Returns the numeric identifier of the mode.
 
 =head2 DEC mode constants
 
-=over 4
+=over
 
 =item * C<ModeCursorKeys> / C<DECCKM> - 1
 
@@ -300,13 +318,13 @@ Returns the numeric identifier of the mode.
 
 =head1 MOUSE
 
-=head2 encode_mouse_button ( $button, $motion, $shift, $alt, $ctrl )
+=head2 C<encode_mouse_button( $button, $motion, $shift, $alt, $ctrl )>
 
 Encodes a button plus modifier state into the SGR mouse button byte. C<$button> is one of the C<Mouse*> constants
 below; C<$motion>, C<$shift>, C<$alt>, C<$ctrl> are booleans. The result is suitable for the C<"$b;$x;$yM"> body of an
 SGR mouse report.
 
-=over 4
+=over
 
 =item * C<MouseNone> - 0 (no button pressed)
 
@@ -334,33 +352,53 @@ SGR mouse report.
 
 =back
 
-=head2 mouse_sgr ( $button, $x, $y, $release )
+=head2 mouse button bitmasks
 
-Returns the SGR mouse report sequence C<\e[<$b;$x;$yM> (or C<m> when C<$release> is true). Coordinates are 1-based and
-non-negative, matching the C<1006> extension.
+These bitmask constants are used internally by C<encode_mouse_button> and can be useful for low-level mouse decoding:
+
+=over
+
+=item * C<B_SHIFT> - 0b00000100 (bit 2) - shift modifier
+
+=item * C<B_ALT> - 0b00001000 (bit 3) - alt/meta modifier
+
+=item * C<B_CTRL> - 0b00010000 (bit 4) - ctrl modifier
+
+=item * C<B_MOTION> - 0b00100000 (bit 5) - mouse motion flag
+
+=item * C<B_WHEEL> - 0b01000000 (bit 6) - wheel event flag
+
+=item * C<B_ADD> - 0b10000000 (bit 7) - extended button (buttons 8-11)
+
+=item * C<B_MASK> - 0b00000011 (bits 0-1) - button number mask
+
+=back
+
+=head2 C<mouse_sgr( $button, $x, $y, $release )>
+
+Returns the SGR mouse report sequence C<\e[<$b;$x;$yM> (or C<m> when C<$release> is true). Negative coordinates are
+automatically negated, then made 1-based (C<$x + 1>, C<$y + 1>), matching the C<1006> extension.
 
 =head1 NOTIFICATIONS (OSC 9, OSC 99)
 
-=head2 notify ( $text )
+=head2 C<notify( $text )>
 
 Returns C<\e]9;$text\a>; the terminal displays a desktop notification (iTerm2/xterm extension).
 
-=head2 desktop_notification ( $payload, @metadata )
+=head2 C<desktop_notification( $payload, @metadata )>
 
 Returns C<\e]99;$metadata;$payload\a>; the terminal shows a desktop notification with colon-separated metadata (e.g.
 C<notify-send> style title/body flags, as used by VTE).
 
 =head1 SGR / SELECT GRAPHIC RENDITION
 
-=head2 SelectGraphicRendition ( @attrs )
+=head2 C<SGR( ... )>
 
-Alias: C<SGR>.
+Returns a single SGR (Select Graphic Rendition) sequence C<\e[<params>m> from the given attribute numbers; negative
+values are clamped to 0, and no arguments produce a plain C<\e[m> reset. Attribute constants for the standard 0-59 SGR
+repertoire and their bright (90-107) variants are exported:
 
-Returns a single SGR sequence C<\e[<params>m> from the given attribute numbers; negative values are clamped to 0, and
-no arguments produce a plain C<\e[m> reset. Attribute constants for the standard 0-59 SGR repertoire and their bright
-(90-107) variants are exported:
-
-=over 4
+=over
 
 =item * C<AttrReset> - 0
 
@@ -422,49 +460,606 @@ no arguments produce a plain C<\e[m> reset. Attribute constants for the standard
 
 =back
 
-Deprecated C<*Attr> aliases matching the Go C<Attr*> naming (C<BoldAttr>, C<ItalicAttr>, C<RedForegroundColorAttr>, and
-so on) are exported too and map to the C<Attr*> constants above.
+=head1 CURSOR (VT510)
+
+Cursor movement, positioning, and style functions based on VT510 / ECMA-48 sequences.
+
+=head2 C<CursorUp( $n //= 1 )>
+
+Alias for C<CUU>. Moves the cursor up C<$n> cells. Sends CSI C<n> A. When C<$n> is 1, the short form C<\e[A> is used.
+
+=head2 C<CUU( $n //= 1 )>
+
+Alias for C<CursorUp>. CSI C<n> A.
+
+=head2 C<CursorDown( $n //= 1 )>
+
+Alias for C<CUD>. Moves the cursor down C<$n> cells. Sends CSI C<n> B.
+
+=head2 C<CUD( $n //= 1 )>
+
+Alias for C<CursorDown>. CSI C<n> B.
+
+=head2 C<CursorForward( $n //= 1 )>
+
+Alias for C<CUF>. Moves the cursor forward (right) C<$n> cells. Sends CSI C<n> C.
+
+=head2 C<CUF( $n //= 1 )>
+
+Alias for C<CursorForward>. CSI C<n> C.
+
+=head2 C<CursorBackward( $n //= 1 )>
+
+Alias for C<CUB>. Moves the cursor backward (left) C<$n> cells. Sends CSI C<n> D.
+
+=head2 C<CUB( $n //= 1 )>
+
+Alias for C<CursorBackward>. CSI C<n> D.
+
+=head2 C<CursorNextLine( $n //= 1 )>
+
+Alias for C<CNL>. Moves the cursor down C<$n> lines and to column 1. Sends CSI C<n> E.
+
+=head2 C<CNL( $n //= 1 )>
+
+Alias for C<CursorNextLine>. CSI C<n> E.
+
+=head2 C<CursorPreviousLine( $n //= 1 )>
+
+Alias for C<CPL>. Moves the cursor up C<$n> lines and to column 1. Sends CSI C<n> F.
+
+=head2 C<CPL( $n //= 1 )>
+
+Alias for C<CursorPreviousLine>. CSI C<n> F.
+
+=head2 C<CursorHorizontalAbsolute( $col = 1 )>
+
+Alias for C<CHA>. Moves the cursor to column C<$col> in the current row. Sends CSI C<n> G.
+
+=head2 C<CHA( $col = 1 )>
+
+Alias for C<CursorHorizontalAbsolute>. CSI C<n> G.
+
+=head2 C<CursorPosition( $col = 1, $row = 1 )>
+
+Alias for C<CUP>. Moves the cursor to column C<$col>, row C<$row>. Sends CSI C<n;m> H. When both C<$col> and C<$row>
+are 1 (or less), returns C<CursorHomePosition> (C<\e[H>) for compatibility.
+
+=head2 C<CUP( $col = 1, $row = 1 )>
+
+Alias for C<CursorPosition>. CSI C<n;m> H.
+
+=head2 C<CursorHorizontalForwardTab( $n //= 1 )>
+
+Alias for C<CHT>. Moves the cursor forward C<$n> tab stops. Sends CSI C<n> I.
+
+=head2 C<CHT( $n //= 1 )>
+
+Alias for C<CursorHorizontalForwardTab>. CSI C<n> I.
+
+=head2 C<EraseCharacter( $n //= 1 )>
+
+Alias for C<ECH>. Erases C<$n> characters starting at the cursor position without moving the cursor. Sends CSI C<n> X.
+
+=head2 C<ECH( $n //= 1 )>
+
+Alias for C<EraseCharacter>. CSI C<n> X.
+
+=head2 C<CursorBackwardTab( $n //= 1 )>
+
+Alias for C<CBT>. Moves the cursor backward C<$n> tab stops. Sends CSI C<n> Z.
+
+=head2 C<CBT( $n //= 1 )>
+
+Alias for C<CursorBackwardTab>. CSI C<n> Z.
+
+=head2 C<VerticalPositionAbsolute( $row //= 1 )>
+
+Alias for C<VPA>. Moves the cursor to row C<$row> in the current column. Sends CSI C<n> d.
+
+=head2 C<VPA( $row //= 1 )>
+
+Alias for C<VerticalPositionAbsolute>. CSI C<n> d.
+
+=head2 C<VerticalPositionRelative( $n //= 1 )>
+
+Alias for C<VPR>. Moves the cursor down C<$n> rows without changing the column. Sends CSI C<n> e.
+
+=head2 C<VPR( $n //= 1 )>
+
+Alias for C<VerticalPositionRelative>. CSI C<n> e.
+
+=head2 C<HorizontalVerticalPosition( $col //= 1, $row //= 1 )>
+
+Alias for C<HVP>. Moves the cursor to column C<$col>, row C<$row>. Sends CSI C<n;m> f.
+
+=head2 C<HVP( $col //= 1, $row //= 1 )>
+
+Alias for C<HorizontalVerticalPosition>. CSI C<n;m> f.
+
+=head2 C<SetCursorStyle( $style //= 1 )>
+
+Alias for C<DECSCUSR>. Sets the cursor style. Sends CSI C<Ps> SP C<q>. C<$style> values:
+
+=over 4
+
+=item 0 - blinking block (default)
+
+=item 1 - blinking block
+
+=item 2 - steady block
+
+=item 3 - blinking underline
+
+=item 4 - steady underline
+
+=item 5 - blinking bar
+
+=item 6 - steady bar
+
+=back
+
+=head2 C<DECSCUSR( $style //= 1 )>
+
+Alias for C<SetCursorStyle>. CSI C<Ps> SP C<q>.
+
+=head2 C<SetPointerShape( $shape )>
+
+Sets the mouse pointer shape via OSC 22. Sends C<\e]22;$shape\a>. C<$shape> is a terminal-dependent string (e.g.
+C<left_ptr>, C<crosshair>).
+
+=head2 C<HorizontalPositionAbsolute( $col //= 1 )>
+
+Alias for C<HPA>. Moves the cursor to column C<$col> in the current row. Sends CSI C<n> C<`>.
+
+=head2 C<HPA( $col = 1 )>
+
+Alias for C<HorizontalPositionAbsolute>. CSI C<n> C<`>.
+
+=head2 C<HorizontalPositionRelative( $n //= 1 )>
+
+Alias for C<HPR>. Moves the cursor forward C<$n> columns. Sends CSI C<n> a.
+
+=head2 C<HPR( $n //= 1 )>
+
+Alias for C<HorizontalPositionRelative>. CSI C<n> a.
+
+=head2 Cursor constants
+
+=over
+
+=item * C<CUU1> - C<\e[A> - Move cursor up 1
+
+=item * C<CUD1> - C<\e[B> - Move cursor down 1
+
+=item * C<CUF1> - C<\e[C> - Move cursor forward 1
+
+=item * C<CUB1> - C<\e[D> - Move cursor backward 1
+
+=item * C<CursorHomePosition> - C<\e[H> - Move cursor to home position (1,1)
+
+=item * C<HorizontalVerticalHomePosition> - C<\e[f> - Move cursor to home position (1,1)
+
+=item * C<SaveCursor> / C<DECSC> - C<\e7> - Save cursor position
+
+=item * C<RestoreCursor> / C<DECRC> - C<\e8> - Restore saved cursor position
+
+=item * C<SaveCurrentCursorPosition> / C<SCOSC> - C<\e[s> - Save current cursor position
+
+=item * C<RestoreCurrentCursorPosition> / C<SCORC> - C<\e[u> - Restore current cursor position
+
+=item * C<ReverseIndex> - C<\eM> - Move cursor up one line (reverse index)
+
+=item * C<Index> - C<\eD> - Move cursor down one line (index)
+
+=item * C<RequestCursorPosition> - C<\e[6n> - Request cursor position report (CPR)
+
+=item * C<RequestExtendedCursorPosition> - C<\e[?6n> - Request extended cursor position report (DECXCPR)
+
+=back
+
+=head1 SCREEN (VT510)
+
+Screen manipulation functions based on VT510 / ECMA-48 sequences.
+
+=head2 C<EraseDisplay( $n //= 0 )>
+
+Alias for C<ED>. Erases part or all of the display. Sends CSI C<n> J.
+
+=over 4
+
+=item 0 - erase below (from cursor to end of display)
+
+=item 1 - erase above (from start of display to cursor)
+
+=item 2 - erase entire display
+
+=item 3 - erase display and scrollback buffer
+
+=back
+
+=head2 C<ED( $n //= 0 )>
+
+Alias for C<EraseDisplay>. CSI C<n> J.
+
+=head2 C<EraseLine( $n //= 0 )>
+
+Alias for C<EL>. Erases part or all of the current line. Sends CSI C<n> K.
+
+=over 4
+
+=item 0 - erase right (from cursor to end of line)
+
+=item 1 - erase left (from start of line to cursor)
+
+=item 2 - erase entire line
+
+=back
+
+=head2 C<EL( $n //= 0 )>
+
+Alias for C<EraseLine>. CSI C<n> K.
+
+=head2 C<ScrollUp( $n //= 1 )>
+
+Alias for C<SU>. Scrolls the display up C<$n> lines. Sends CSI C<Pn> S.
+
+=head2 C<SU( $n //= 1 )>
+
+Alias for C<ScrollUp>. CSI C<Pn> S.
+
+=head2 C<ScrollDown( $n //= 1 )>
+
+Alias for C<SD>. Scrolls the display down C<$n> lines. Sends CSI C<Pn> T.
+
+=head2 C<SD( $n //= 1 )>
+
+Alias for C<ScrollDown>. CSI C<Pn> T.
+
+=head2 C<InsertLine( $n //= 1 )>
+
+Alias for C<IL>. Inserts C<$n> blank lines at the current cursor position. Sends CSI C<Pn> L.
+
+=head2 C<IL( $n //= 1 )>
+
+Alias for C<InsertLine>. CSI C<Pn> L.
+
+=head2 C<DeleteLine( $n //= 1 )>
+
+Alias for C<DL>. Deletes C<$n> lines starting at the current cursor position. Sends CSI C<Pn> M.
+
+=head2 C<DL( $n //= 1 )>
+
+Alias for C<DeleteLine>. CSI C<Pn> M.
+
+=head2 C<SetTopBottomMargins( $top //= 0, $bot //= 0 )>
+
+Alias for C<DECSTBM>. Sets the top and bottom scrolling margins. Sends CSI C<Pt;Pb> r.
+
+=head2 C<DECSTBM( $top //= 0, $bot //= 0 )>
+
+Alias for C<SetTopBottomMargins>. CSI C<Pt;Pb> r.
+
+=head2 C<SetLeftRightMargins( $left = 0, $right = 0 )>
+
+Alias for C<DECSLRM>. Sets the left and right scrolling margins. Sends CSI C<Pl;Pr> s.
+
+=head2 C<DECSLRM( $left = 0, $right = 0 )>
+
+Alias for C<SetLeftRightMargins>. CSI C<Pl;Pr> s.
+
+=head2 C<InsertCharacter( $n //= 1 )>
+
+Alias for C<ICH>. Inserts C<$n> blank characters at the current cursor position. Sends CSI C<Pn> @.
+
+=head2 C<ICH( $n //= 1 )>
+
+Alias for C<InsertCharacter>. CSI C<Pn> @.
+
+=head2 C<DeleteCharacter( $n //= 1 )>
+
+Alias for C<DCH>. Deletes C<$n> characters starting at the current cursor position. Sends CSI C<Pn> P.
+
+=head2 C<DCH( $n //= 1 )>
+
+Alias for C<DeleteCharacter>. CSI C<Pn> P.
+
+=head2 C<TabClear( $n //= 0 )>
+
+Alias for C<TBC>. Clears tab stops. Sends CSI C<Pn> g.
+
+=over 4
+
+=item 0 - clear the tab stop at the current column
+
+=item 3 - clear all tab stops
+
+=back
+
+=head2 C<TBC( $n //= 0 )>
+
+Alias for C<TabClear>. CSI C<Pn> g.
+
+=head2 C<RequestPresentationStateReport( $n //= 0 )>
+
+Alias for C<DECRQPSR>. Requests a terminal presentation state report. Sends CSI C<Ps> $ w.
+
+=head2 C<DECRQPSR( $n //= 0 )>
+
+Alias for C<RequestPresentationStateReport>. CSI C<Ps> $ w.
+
+=head2 C<TabStopReport( @stops )>
+
+Alias for C<DECTABSR>. Builds a DCS tab stop report response with the given stop positions. Sends DCS C<2$u>
+C<stop/stop/...> ST.
+
+=head2 C<DECTABSR( @stops )>
+
+Alias for C<TabStopReport>. DCS C<2$u> ... ST.
+
+=head2 C<CursorInformationReport( @values )>
+
+Alias for C<DECCIR>. Builds a DCS cursor information report response with the given values. Sends DCS C<1$u>
+C<val;val;...> ST.
+
+=head2 C<DECCIR( @values )>
+
+Alias for C<CursorInformationReport>. DCS C<1$u> ... ST.
+
+=head2 C<RepeatPreviousCharacter( $n //= 1 )>
+
+Alias for C<REP>. Repeats the previous character C<$n> times. Sends CSI C<n> b.
+
+=head2 C<REP( $n //= 1 )>
+
+Alias for C<RepeatPreviousCharacter>. CSI C<n> b.
+
+=head2 Screen constants
+
+=over
+
+=item * C<EraseScreenBelow> - C<\e[J> - Erase below cursor
+
+=item * C<EraseScreenAbove> - C<\e[1J> - Erase above cursor
+
+=item * C<EraseEntireScreen> - C<\e[2J> - Erase entire screen
+
+=item * C<EraseEntireDisplay> - C<\e[3J> - Erase display and scrollback
+
+=item * C<EraseLineRight> - C<\e[K> - Erase to end of line
+
+=item * C<EraseLineLeft> - C<\e[1K> - Erase to start of line
+
+=item * C<EraseEntireLine> - C<\e[2K> - Erase entire line
+
+=item * C<HorizontalTabSet> - C<\eH> - Set a tab stop at current column
+
+=item * C<SetTabEvery8Columns> - C<\e[?5W> - Set tab stops every 8 columns
+
+=back
+
+=head1 XTERM KEY MODIFIER OPTIONS
+
+Functions for querying and setting xterm key modifier resource options.
+
+=head2 C<KeyModifierOptions( $resource, @values )>
+
+Alias for C<XTMODKEYS>. Sends CSI C<< > Ps m >> to reset or CSI C<< > Ps;Pv m >> to set a key modifier option.
+C<$resource> is the xterm resource number; C<@values> are optional parameter values.
+
+=head2 C<XTMODKEYS( $resource, @values )>
+
+Alias for C<KeyModifierOptions>.
+
+=head2 C<SetKeyModifierOptions( $resource, $value )>
+
+Sets a key modifier option. Sends CSI C<< > Ps;Pv m >>.
+
+=head2 C<ResetKeyModifierOptions( $resource )>
+
+Resets a key modifier option. Sends CSI C<< > Ps m >>.
+
+=head2 C<QueryKeyModifierOptions( $resource )>
+
+Alias for C<XTQMODKEYS>. Queries a key modifier option. Sends CSI C<?> C<Ps> m.
+
+=head2 C<XTQMODKEYS( $resource )>
+
+Alias for C<QueryKeyModifierOptions>.
+
+=head2 C<ModifyOtherKeys( $mode )>
+
+Sets the C<modifyOtherKeys> mode. Sends CSI C<< > 4;mode m >>.
+
+=head2 Key modifier option constants
+
+=over
+
+=item * C<SetModifyOtherKeys1> - C<\e[>4;1m> - Set modifyOtherKeys mode 1
+
+=item * C<SetModifyOtherKeys2> - C<\e[>4;2m> - Set modifyOtherKeys mode 2
+
+=item * C<ResetModifyOtherKeys> - C<\e[>4m> - Reset modifyOtherKeys
+
+=item * C<QueryModifyOtherKeys> - C<\e[?4m> - Query modifyOtherKeys state
+
+=back
+
+=head1 WINDOW OPERATIONS (xterm)
+
+Functions for xterm window operations.
+
+=head2 C<WindowOp( $op, @params )>
+
+Alias for C<XTWINOPS>. Sends a window operation sequence CSI C<Ps ; ... t>. C<$op> is the operation code; C<@params>
+are optional additional parameters. Returns the empty string when C<$op> is not positive.
+
+=head2 C<XTWINOPS( $op, @params )>
+
+Alias for C<WindowOp>.
+
+=head2 Window operation constants
+
+=over
+
+=item * C<ResizeWindowWinOp> - 4 - Resize window to given dimensions
+
+=item * C<RequestWindowSizeWinOp> - 14 - Request window size in pixels
+
+=item * C<RequestCellSizeWinOp> - 16 - Request cell size in pixels
+
+=back
+
+=head1 DEVICE STATUS REPORTS
+
+Functions for device status reporting (DSR) and cursor position reports.
+
+=head2 C<DeviceStatusReport( @statuses )>
+
+Alias for C<DSR>. Builds a device status report sequence. ANSI status values are passed as plain numbers; DEC private
+status values are passed as array refs C<[DEC => $num]>. Sends CSI C<n> n (ANSI) or CSI C<?> C<n> n (DEC).
+
+=head2 C<DSR( @statuses )>
+
+Alias for C<DeviceStatusReport>.
+
+=head2 C<CursorPositionReport( $line, $column )>
+
+Alias for C<CPR>. Builds a cursor position report response. Sends CSI C<Pl;Pc> R. Values are clamped to a minimum of 1.
+
+=head2 C<CPR( $line, $column )>
+
+Alias for C<CursorPositionReport>.
+
+=head2 C<ExtendedCursorPositionReport( $line, $column, $page = 0 )>
+
+Alias for C<DECXCPR>. Builds an extended cursor position report response. Sends CSI C<?> C<Pl;Pc[;Pp]> R. Values are
+clamped to a minimum of 1. The page parameter is omitted when less than 1.
+
+=head2 C<DECXCPR( $line, $column, $page = 0 )>
+
+Alias for C<ExtendedCursorPositionReport>.
+
+=head2 C<LightDarkReport( $dark )>
+
+Builds a light/dark mode report response. Sends C<\e[?997;1n> when C<$dark> is true, or C<\e[?997;2n> otherwise.
+
+=head2 Device status report constants
+
+=over
+
+=item * C<RequestCursorPositionReport> - C<\e[6n> - Request cursor position report
+
+=item * C<RequestExtendedCursorPositionReport> - C<\e[?6n> - Request extended cursor position report
+
+=item * C<RequestLightDarkReport> - C<\e[?996n> - Request light/dark mode report
+
+=back
+
+=head1 CHARACTER SET SELECTION
+
+Functions for selecting character sets in 8-bit character coding environments.
+
+=head2 C<SelectCharacterSet( $gset, $charset )>
+
+Alias for C<SCS>. Selects a character set for the given G-set designation. Sends ESC C<$gset> C<$charset>.
+
+=head2 C<SCS( $gset, $charset )>
+
+Alias for C<SelectCharacterSet>.
+
+=head2 Character set constants
+
+=over
+
+=item * C<LS1R> - C<\e~> - Locking shift 1 right (G1)
+
+=item * C<LS2> - C<\en> - Locking shift 2 (G2)
+
+=item * C<LS2R> - C<\e}> - Locking shift 2 right (G2)
+
+=item * C<LS3> - C<\eo> - Locking shift 3 (G3)
+
+=item * C<LS3R> - C<\e|> - Locking shift 3 right (G3)
+
+=back
+
+=head1 UNDERLINE STYLES
+
+Underline style constants for use with the SGR C<AttrUnderline> attribute (SGR code 4). Extended underline styles
+require colon-separated sub-parameters.
+
+=over
+
+=item * C<UnderlineNone> - 0
+
+=item * C<UnderlineSingle> - 1
+
+=item * C<UnderlineDouble> - 2
+
+=item * C<UnderlineCurly> - 3
+
+=item * C<UnderlineDotted> - 4
+
+=item * C<UnderlineDashed> - 5
+
+=back
+
+=head2 C<ResetStyle>
+
+Constant C<\e[m> that resets all graphic rendition attributes to default.
+
+=head3 Usage with SGR
+
+    use Cancer::Ansi qw[SGR AttrUnderline UnderlineSingle UnderlineDouble UnderlineCurly];
+
+    print SGR(AttrUnderline);                   # \e[4m   (single underline)
+    print SGR("4:2");                           # \e[4:2m (double underline)
+    print SGR("4:3");                           # \e[4:3m (curly underline)
+    print SGR("4:4");                           # \e[4:4m (dotted underline)
+    print SGR("4:5");                           # \e[4:5m (dashed underline)
+    print SGR(ResetStyle);                      # \e[m    (reset all)
 
 =head1 PASSTHROUGH
 
-=head2 ScreenPassthrough ( $sequence, $limit = 0 )
+=head2 C<ScreenPassthrough( $sequence, $limit = 0 )>
 
 Wraps C<$sequence> in a DCS I<screen> passthrough: C<\eP...\e\\>. When C<$limit> is positive the payload is chunked
 into pieces no longer than C<$limit> bytes, separated by C<\e\\\eP> so that long frames survive terminals that cap DCS
 payload lengths.
 
-=head2 TmuxPassthrough ( $sequence )
+=head2 C<TmuxPassthrough( $sequence )>
 
 Wraps C<$sequence> in the tmux passthrough prefix C<\ePtmux;...\e\\>, escaping any embedded ESC byte as a doubled
 C<\e\e> per tmux's rule.
 
 =head1 TERMINAL-SPECIFIC EXTENSIONS
 
-=head2 URxvtExt ( $extension, @params )
+=head2 C<URxvtExt( $extension, @params )>
 
 Returns an rxvt-unicode extension frame C<\e]777;$extension;$params\x07>.
 
-=head2 ITerm2 ( $data )
+=head2 C<ITerm2( $data )>
 
 Returns an iTerm2 escape frame C<\e]1337;$data\x07> for iTerm2-proprietary codes such as inline images or the
 copy-to-clipboard (C<CopyToClipboard>) action.
 
 =head1 COLOR CONVERSION
 
-=head2 color_to_hex_string ( $hex )
+=head2 C<color_to_hex_string( $hex )>
 
 Formats an integer RGB value as a C<#rrggbb> string.
 
-=head2 hex_to_rgb ( $hex )
+=head2 C<hex_to_rgb( $hex )>
 
 Splits an integer RGB value into an C<( r, g, b )> list of 0-255 bytes.
 
-=head2 ansi_to_rgb ( $index )
+=head2 C<ansi_to_rgb( $index )>
 
 Returns the C<( r, g, b )> triple for an ANSI 256-color palette index (0-255). The table includes the 16 base colors
 and the standard 216-color cube plus 24 grayscale entries.
 
-=head2 convert_256 ( $hex )
+=head2 C<convert_256( $hex )>
 
 Converts a 24-bit color value (as returned by C<hex_to_rgb>) to the nearest ANSI 256-color palette index, choosing
 between the color cube and the gray ramp by squared-distance comparison. This is the classic C<{r,g,b} -> 256> mapping
@@ -472,30 +1067,30 @@ used when a terminal only supports 256 colors.
 
 =head1 PALETTE (OSC 104)
 
-=head2 set_palette ( $index, $r, $g, $b )
+=head2 C<set_palette( $index, $r, $g, $b )>
 
 Returns C<\e]PE<lt>indexE<gt>rrggbb\a> (the xterm C<OSC 104> color-set form) which repaints one of the 16 color-slot
 colors. Returns the empty string for out-of-range indices or missing components.
 
-=head2 ResetPalette
+=head2 C<ResetPalette>
 
 Constant C<\e]R\a> that resets the entire color palette to the terminal defaults.
 
 =head1 PROGRESS BAR (OSC 9;4)
 
-=head2 set_progress_bar ( $pct )
+=head2 C<set_progress_bar( $pct )>
 
 Returns C<\e]9;4;1;$pct\a>; sets the terminal's progress bar to a percentage in 0-100 (clamped).
 
-=head2 set_error_progress_bar ( $pct )
+=head2 C<set_error_progress_bar( $pct )>
 
 Returns C<\e]9;4;2;$pct\a>; sets an error-styled progress bar.
 
-=head2 set_warning_progress_bar ( $pct )
+=head2 C<set_warning_progress_bar( $pct )>
 
 Returns C<\e]9;4;4;$pct\a>; sets a warning-styled progress bar.
 
-=over 4
+=over
 
 =item * C<ResetProgressBar>
 
@@ -509,7 +1104,7 @@ Constant C<\e]9;4;3\a> that shows an indeterminate (animated) progress bar.
 
 =head1 SEE ALSO
 
-=over 4
+=over
 
 =item * L<Cancer::Screen> - parses these sequences into a cell buffer
 
@@ -527,6 +1122,9 @@ repertoire that most of these sequences implement
 =item * L<xterm control sequences|https://invisible-island.net/xterm/ctlseqs/ctlseqs.html> -
 the OSC/DEC private sequences (colors, clipboard, titles, mouse, paste)
 
+=item * L<VT510 terminal escape sequences|https://invisible-island.net/xterm/ctlseqs/ctlseqs.html> -
+VT510 cursor and screen manipulation sequences (CSI, DCS)
+
 =item * L<The kitty keyboard protocol|https://sw.kovidgoyal.net/kitty/keyboard-protocol/>
 
 =item * L<The kitty graphics protocol|https://sw.kovidgoyal.net/kitty/graphics-protocol/>
@@ -537,18 +1135,23 @@ The upstream cousin of this module is C<github.com/charmbracelet/x/ansi>, the es
 by Bubble Tea v2; Cancer::Ansi provides the builder half (and C<Cancer::Ansi::Parser> the parser half), tuned to emit
 byte-for-byte compatible sequences.
 
-=head1 AUTHOR
-
-Sanko Robinson - L<https://github.com/sanko>
-
 =head1 LICENSE
 
-This software is Copyright (c) 2026 by Cancer Authors.
+This software is Copyright (c) 2020 by Sanko Robinson.
 
 This is free software, licensed under:
 
   The Artistic License 2.0 (GPL Compatible)
 
-The full text of the license can be found in the F<LICENSE> file included with this distribution.
+See the F<LICENSE> file for full text.
+
+=head1 AUTHOR
+
+Sanko Robinson  L<https://github.com/sanko>
+
+=begin stopwords
+
+
+=end stopwords
 
 =cut

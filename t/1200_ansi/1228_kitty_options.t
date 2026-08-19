@@ -1,6 +1,7 @@
 use v5.42;
 use experimental 'class';
 use Test2::V1 -ipP;
+use blib;
 use lib 'lib', '../lib';
 
 # Ported from charmbracelet/x/ansi/kitty/options_test.go
@@ -12,9 +13,7 @@ sub build_options {
     $o->{action} = ( $o->{action} // 0 ) || 't';
     $o->{delete} = ( $o->{delete} // 0 ) || 'a';
     my $transmission = $o->{transmission} || '';
-    if ( !$transmission ) {
-        $transmission = ( $o->{file} // '' ) ne '' ? 'f' : 'd';
-    }
+    $transmission = ( $o->{file} // '' ) ne '' ? 'f' : 'd' if !$transmission;
     my @opts;
     push @opts, sprintf( 'f=%d', $o->{format} ) if $o->{format} != 32;
     my $quiet = $o->{quiet} // 0;
@@ -28,12 +27,9 @@ sub build_options {
     push @opts, "t=$transmission"                     if $transmission ne 'd';
     push @opts, sprintf( 'S=%d', $o->{size} )         if ( $o->{size} // 0 ) > 0;
     push @opts, sprintf( 'O=%d', $o->{offset} )       if ( $o->{offset} // 0 ) > 0;
-
-    if ( defined $o->{compression} && $o->{compression} eq 'z' ) {
-        push @opts, 'o=z';
-    }
-    push @opts, 'U=1' if $o->{virtual_placement};
-    push @opts, 'C=1' if $o->{do_not_move_cursor};
+    push @opts, 'o=z'                                 if defined $o->{compression} && $o->{compression} eq 'z';
+    push @opts, 'U=1'                                 if $o->{virtual_placement};
+    push @opts, 'C=1'                                 if $o->{do_not_move_cursor};
     push @opts, sprintf( 'P=%d', $o->{parent_id} )           if ( $o->{parent_id}           // 0 ) > 0;
     push @opts, sprintf( 'Q=%d', $o->{parent_placement_id} ) if ( $o->{parent_placement_id} // 0 ) > 0;
     push @opts, sprintf( 'x=%d', $o->{x} )                   if ( $o->{x}                   // 0 ) > 0;
@@ -76,7 +72,7 @@ subtest 'TestOptions_Options' => sub {
             [ map +("$_"), sort qw(p=3 I=2 t=f O=100) ]
         ],
         [ 'quiet mode and format', { quiet => 2, format => 24 }, [qw(f=24 q=2)] ],
-        [ 'all zero values', { format => 0, action => 0, delete => 0 }, [] ],
+        [ 'all zero values', { format => 0, action => 0, delete => 0 }, [] ]
     );
     for my $tc (@tests) {
         my ( $name, $options, $expected ) = @$tc;
@@ -91,7 +87,7 @@ subtest 'TestOptions_QuiteDeprecation' => sub {
         [ 'deprecated Quite only',     { quite => 2 },             ['q=2'] ],
         [ 'Quite overrides Quiet',     { quiet => 1, quite => 2 }, ['q=2'] ],
         [ 'Quite=0 does not override', { quiet => 1, quite => 0 }, ['q=1'] ],
-        [ 'both zero emits no q=',     {},                         [] ],
+        [ 'both zero emits no q=',     {},                         [] ]
     );
     for my $tc (@tests) {
         my ( $name, $options, $expected ) = @$tc;
@@ -137,7 +133,7 @@ subtest 'TestOptions_String' => sub {
                 rows                => 3,
                 virtual_placement   => 1,
                 parent_id           => 999,
-                parent_placement_id => 888,
+                parent_placement_id => 888
             },
             'f=1,q=81,i=123,p=456,I=789,s=800,v=600,t=T,S=1024,O=10,U=1,P=999,Q=888,x=100,y=200,z=300,w=400,h=500,X=50,Y=60,c=4,r=3,d=D,a=A',
         ],
@@ -155,7 +151,7 @@ subtest 'TestOptions_MarshalText' => sub {
         [ 'marshal empty options', {}, '' ],
         [   'marshal with values',
             { action => 'A', id => 123, width => 400, height => 500, quiet => 2, do_not_move_cursor => 1 },
-            'q=2,i=123,C=1,w=400,h=500,a=A',
+            'q=2,i=123,C=1,w=400,h=500,a=A'
         ],
     );
     for my $tc (@tests) {
@@ -170,14 +166,14 @@ subtest 'TestOptions_UnmarshalText' => sub {
     my %opts_default = ( format => 32, action => 't', delete => 'a' );
     my @tests        = (
         [ 'unmarshal empty',                  '',                      {} ],
-        [ 'unmarshal basic options',          'a=A,i=123,w=400,h=500', { action => 'A', id => 123, width => 400, height => 500 }, ],
+        [ 'unmarshal basic options',          'a=A,i=123,w=400,h=500', { action => 'A', id => 123, width => 400, height => 500 } ],
         [ 'unmarshal with invalid number',    'i=abc',                 {} ],
         [ 'unmarshal q= populates Quiet',     'q=1',                   { quiet             => 1 } ],
         [ 'unmarshal with delete resources',  'd=D',                   { delete            => 'd', delete_resources => 1 } ],
         [ 'unmarshal with boolean chunk',     'm=1',                   { chunk             => 1 } ],
         [ 'unmarshal with virtual placement', 'U=1',                   { virtual_placement => 1 } ],
         [ 'unmarshal with invalid format',    'invalid=format',        {} ],
-        [ 'unmarshal with missing value',     'a=',                    {} ],
+        [ 'unmarshal with missing value',     'a=',                    {} ]
     );
     for my $tc (@tests) {
         my ( $name, $text, $want ) = @$tc;
@@ -248,4 +244,5 @@ sub unmarshal_text {
     }
     return $o;
 }
+#
 done_testing;

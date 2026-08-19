@@ -26,10 +26,38 @@ provides:
   Cancer::Ansi:
     file: lib/Cancer/Ansi.pm
     version: v0.0.1
+  Cancer::Ansi::Iterm2:
+    file: lib/Cancer/Ansi/Iterm2.pm
+    version: v0.0.1
+  Cancer::Ansi::Kitty:
+    file: lib/Cancer/Ansi/Kitty.pm
+    version: v0.0.1
+  Cancer::Ansi::Kitty::Decoder:
+    file: lib/Cancer/Ansi/Kitty/Decoder.pm
+    version: v0.0.1
+  Cancer::Ansi::Kitty::Encoder:
+    file: lib/Cancer/Ansi/Kitty/Encoder.pm
+    version: v0.0.1
+  Cancer::Ansi::Parser:
+    file: lib/Cancer/Ansi/Parser.pm
+  Cancer::Ansi::Sixel:
+    file: lib/Cancer/Ansi/Sixel.pm
+    version: v0.0.1
+  Cancer::Ansi::Sixel::Raster:
+    file: lib/Cancer/Ansi/Sixel.pm
+    version: v0.0.1
+  Cancer::Ansi::Sixel::Repeat:
+    file: lib/Cancer/Ansi/Sixel.pm
+    version: v0.0.1
+  Cancer::Ansi::Style:
+    file: lib/Cancer/Ansi.pm
   Cancer::Bubbles:
     file: lib/Cancer.pm
   Cancer::Lipgloss:
     file: lib/Cancer.pm
+  Cancer::Util:
+    file: lib/Cancer/Util.pm
+    version: v0.0.1
 requires:
   Acme::Parataxis: '0'
   Affix: '0'

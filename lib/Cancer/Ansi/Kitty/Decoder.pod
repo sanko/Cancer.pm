@@ -1,0 +1,95 @@
+=head1 NAME
+
+Cancer::Ansi::Kitty::Decoder - Decode kitty graphics protocol payloads into raw pixels
+
+=head1 SYNOPSIS
+
+    use Cancer::Ansi::Kitty qw(RGBA);
+    use Cancer::Ansi::Kitty::Decoder;
+
+    my $image = Cancer::Ansi::Kitty::Decoder->new(
+        format      => RGBA,
+        decompress  => 1,
+        width       => 40,
+        height      => 25
+    )->decode($payload);
+
+    say $image->{width} . 'x' . $image->{height} . ' ' . length( $image->{pixels} ) . ' bytes';
+
+=head1 DESCRIPTION
+
+B<Cancer::Ansi::Kitty::Decoder> turns the payloads of the I<kitty graphics protocol> back into raw pixels. It
+understands the three wire formats the protocol supports: uncompressed RGBA and RGB, and PNG. Payloads carrying the
+zlib compression flag can be inflated in place, and PNG payloads are parsed directly, inflating their C<IDAT> chunks
+and decoding the scanlines.
+
+The result is always the same shape: a hashref with C<width>, C<height> and C<pixels> keys, where C<pixels> is a byte
+string of interleaved RGBA samples (C<0..255> per channel). It pairs with L<Cancer::Ansi::Kitty::Encoder>, which
+performs the inverse transformation.
+
+=head1 CONSTRUCTOR PARAMETERS
+
+=over
+
+=item * C<decompress> - When true, the input is passed through
+C<Compress::Zlib::uncompress> before decoding. Default: C<0>.
+
+=item * C<format> - The payload format. Defaults to C<RGBA> when C<0>. May be
+C<RGBA>, C<RGB> or C<PNG> from L<Cancer::Ansi::Kitty>.
+
+=item * C<width> - The image width in pixels. Required for the C<RGBA> and
+C<RGB> formats, which have no size header. Default: C<0>.
+
+=item * C<height> - The image height in pixels. Required for the C<RGBA> and
+C<RGB> formats. Default: C<0>.
+
+=back
+
+=head1 METHODS
+
+=head2 C<decode( $data )>
+
+Decodes the payload C<$data> and returns C<< { width => $w, height => $h, pixels => $raw_rgba } >>. When C<decompress>
+is enabled the payload is inflated first. Unsupported formats and truncated pixel buffers die with a descriptive
+message.
+
+=head1 SEE ALSO
+
+=over
+
+=item * L<Cancer::Ansi::Kitty::Encoder> - The inverse operation, serialising
+pixels into protocol payloads.
+
+=item * L<Cancer::Ansi::Kitty> - The protocol constants (C<RGBA>, C<RGB>,
+C<PNG>) shared by both ends.
+
+=item * L<Cancer::Ansi::Sixel> - The alternative DEC sixel image format.
+
+=item * L<Cancer::Ansi::Iterm2> - The iTerm2 inline image protocol.
+
+=back
+
+The upstream cousin of this module is the kitty graphics protocol implementation in Bubble Tea's I<x/term>. The wire
+format is specified at L<kitty graphics protocol|https://sw.kovidgoyal.net/kitty/graphics-protocol/>, and the PNG
+container at L<PNG specification|https://www.w3.org/TR/png-3/>.
+
+=head1 LICENSE
+
+This software is Copyright (c) 2020 by Sanko Robinson.
+
+This is free software, licensed under:
+
+  The Artistic License 2.0 (GPL Compatible)
+
+See the F<LICENSE> file for full text.
+
+=head1 AUTHOR
+
+Sanko Robinson  L<https://github.com/sanko>
+
+=begin stopwords
+
+
+=end stopwords
+
+=cut

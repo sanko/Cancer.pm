@@ -18,8 +18,7 @@ sub write_color {
     return sprintf( '#%d;%d;%d;%d;%d', $pc, $pu, $px, $py, $pz );
 }
 
-sub decode_color {
-    my ($data) = @_;
+sub decode_color($data) {
     return ( {}, 0 ) if !length $data || ord( substr( $data, 0, 1 ) ) != COLOR_INTRODUCER;
     return ( {}, 0 ) if length $data < 2;
     my $c  = {};
@@ -27,7 +26,6 @@ sub decode_color {
     my $pc = \$c->{pc};
     $pc //= 0;
     $c->{pc} = 0;
-
     for ( $n = 1; $n < length $data; $n++ ) {
         my $ch = substr( $data, $n, 1 );
         if ( $ch eq ';' ) {
@@ -75,23 +73,19 @@ sub decode_color {
     return ( $c, $n );
 }
 
-sub palval {
-    my ( $n, $a, $m ) = @_;
+sub palval ( $n, $a, $m ) {
     return int( ( $n * $a + $m / 2 ) / $m );
 }
 
-sub _to16bit {
-    my ($v) = @_;
+sub _to16bit ($v) {
     return $v * 257;    # convert 8-bit to 16-bit as Go's color.Color.RGBA() does
 }
 
-sub sixel_rgb {
-    my ( $r, $g, $b ) = @_;
+sub sixel_rgb ( $r, $g, $b ) {
     return ( _to16bit( palval( $r, 255, 100 ) ), _to16bit( palval( $g, 255, 100 ) ), _to16bit( palval( $b, 255, 100 ) ), 0xFFFF );
 }
 
-sub sixel_hls {
-    my ( $h, $l, $s ) = @_;
+sub sixel_hls ( $h, $l, $s ) {
 
     # HLS to RGB conversion using the 6-cone model (matching Go's colorful.Hsl)
     my $c = ( 1 - abs( 2 * $l / 100 - 1 ) ) * $s / 100;
@@ -128,13 +122,12 @@ my @SIXEL_PALETTE = (
     [ 153, 87,  153 ],    # 12
     [ 87,  153, 153 ],    # 13
     [ 153, 153, 87 ],     # 14
-    [ 204, 204, 204 ],    # 15
+    [ 204, 204, 204 ]     # 15
 );
 
-sub color_rgba {
-    my ($c) = @_;
-    my $pu  = $c->{pu} // 0;
-    my $pc  = $c->{pc} // 0;
+sub color_rgba ($c) {
+    my $pu = $c->{pu} // 0;
+    my $pc = $c->{pc} // 0;
     if ( $pu == 1 ) {
         return sixel_hls( $c->{px} // 0, $c->{py} // 0, $c->{pz} // 0 );
     }
@@ -153,7 +146,7 @@ subtest 'TestWriteColor' => sub {
         [ 'simple color number', 1, 0, 0,   0,  0,   '#1' ],
         [ 'RGB color',           1, 2, 50,  60, 70,  '#1;2;50;60;70' ],
         [ 'HLS color',           2, 1, 180, 50, 100, '#2;1;180;50;100' ],
-        [ 'invalid pu > 2',      1, 3, 0,   0,  0,   '#1' ],
+        [ 'invalid pu > 2',      1, 3, 0,   0,  0,   '#1' ]
     );
     for my $tc (@tests) {
         my ( $name, $pc, $pu, $px, $py, $pz, $want ) = @$tc;
@@ -168,7 +161,7 @@ subtest 'TestDecodeColor' => sub {
         [ 'HLS color',           '#2;1;180;50;100', { pc => 2, pu => 1, px => 180, py => 50, pz => 100 }, 15 ],
         [ 'empty input',         '',                {},                                                   0 ],
         [ 'invalid introducer',  'X1',              {},                                                   0 ],
-        [ 'incomplete sequence', '#',               {},                                                   0 ],
+        [ 'incomplete sequence', '#',               {},                                                   0 ]
     );
     for my $tc (@tests) {
         my ( $name, $input, $want_c, $want_n ) = @$tc;
@@ -185,7 +178,7 @@ subtest 'TestColor_RGBA' => sub {
     my @tests = (
         [ 'default color map 0 (black)', { pc => 0 }, 0x0000, 0x0000, 0x0000, 0xFFFF ],
         [ 'RGB mode (50%, 60%, 70%)',    { pc => 1, pu => 2, px => 50,  py => 60, pz => 70 },  0x8080, 0x9999, 0xB3B3, 0xFFFF ],
-        [ 'HLS mode (180°, 50%, 100%)',  { pc => 1, pu => 1, px => 180, py => 50, pz => 100 }, 0x0000, 0xFFFF, 0xFFFF, 0xFFFF ],
+        [ 'HLS mode (180°, 50%, 100%)',  { pc => 1, pu => 1, px => 180, py => 50, pz => 100 }, 0x0000, 0xFFFF, 0xFFFF, 0xFFFF ]
     );
     for my $tc (@tests) {
         my ( $name, $color, $want_r, $want_g, $want_b, $want_a ) = @$tc;
@@ -201,7 +194,7 @@ subtest 'TestSixelRGB' => sub {
         [ 'black',          0,   0,   0,   0x0000, 0x0000, 0x0000, 0xFFFF ],
         [ 'white',          100, 100, 100, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF ],
         [ 'red',            100, 0,   0,   0xFFFF, 0x0000, 0x0000, 0xFFFF ],
-        [ 'half intensity', 50,  50,  50,  0x8080, 0x8080, 0x8080, 0xFFFF ],
+        [ 'half intensity', 50,  50,  50,  0x8080, 0x8080, 0x8080, 0xFFFF ]
     );
     for my $tc (@tests) {
         my ( $name, $r, $g, $b, $want_r, $want_g, $want_b, $want_a ) = @$tc;
@@ -218,7 +211,7 @@ subtest 'TestSixelHLS' => sub {
         [ 'white',      0,   100, 0,   0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF ],
         [ 'pure red',   0,   50,  100, 0xFFFF, 0x0000, 0x0000, 0xFFFF ],
         [ 'pure green', 120, 50,  100, 0x0000, 0xFFFF, 0x0000, 0xFFFF ],
-        [ 'pure blue',  240, 50,  100, 0x0000, 0x0000, 0xFFFF, 0xFFFF ],
+        [ 'pure blue',  240, 50,  100, 0x0000, 0x0000, 0xFFFF, 0xFFFF ]
     );
     for my $tc (@tests) {
         my ( $name, $h, $l, $s, $want_r, $want_g, $want_b, $want_a ) = @$tc;
@@ -229,4 +222,5 @@ subtest 'TestSixelHLS' => sub {
         is $got_a, $want_a, "$name: A";
     }
 };
+#
 done_testing;
