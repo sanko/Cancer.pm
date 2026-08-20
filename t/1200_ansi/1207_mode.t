@@ -3,7 +3,6 @@ use experimental 'class';
 use Test2::V1 -ipP;
 use blib;
 use lib 'lib', '../lib';
-use Data::Dump qw[pp];
 
 # Ported from charmbracelet/x/ansi mode_test.go
 use Cancer::Ansi qw[/Mode/ /mode/];
