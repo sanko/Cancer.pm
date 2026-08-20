@@ -1,0 +1,94 @@
+=encoding utf8
+
+=head1 NAME
+
+Cancer::ColorProfile::Writer - Auto-downsample ANSI escape sequences to match terminal capabilities
+
+=head1 SYNOPSIS
+
+    use Cancer::ColorProfile::Writer;
+
+    # Auto-detect profile from stdout
+    my $w = Cancer::ColorProfile::Writer->new( forward => \*STDOUT );
+    $w->write("\e[38;2;107;80;255mHello\e[m");
+
+    # Force a specific profile
+    my $w = Cancer::ColorProfile::Writer->new(
+        forward => \*STDOUT,
+        profile => ANSI256
+    );
+
+    # Write to a string buffer
+    my $buf = '';
+    my $w = Cancer::ColorProfile::Writer->new(forward => \$buf);
+    $w->write("\e[38;2;255;0;0mRed\e[m");
+    say $buf;
+
+=head1 DESCRIPTION
+
+Cancer::ColorProfile::Writer wraps an output filehandle and automatically downsamples ANSI escape sequences to match
+the terminal's color capabilities. It is a port of Go's L<github.com/charmbracelet/colorprofile.Writer>.
+
+When writing, the Writer inspects each SGR (Select Graphic Rendition) sequence and converts colors that the target
+profile cannot display:
+
+=over
+
+=item B<TrueColor> - passes everything through unchanged
+
+=item B<ANSI256> - converts RGB colors to 256-color palette
+
+=item B<ANSI> - converts RGB and 256-color to 16-color basic palette
+
+=item B<ASCII>/B<NoTTY> - strips all escape sequences
+
+=back
+
+=head1 METHODS
+
+=head2 C<new( ... )>
+
+Create a new Writer. Accepted arguments:
+
+=over
+
+=item C<forward> - output filehandle (defaults to C<\*STDOUT>)
+
+=item C<profile> - force a specific profile (bypasses detection)
+
+=item C<environ> - hashref of environment variables for detection
+
+=back
+
+=head2 C<write( $data )>
+
+Write C<$data> to the forward handle, downsampling escape sequences as needed. Returns the number of bytes written.
+
+=head2 C<profile( )>
+
+Returns the current color profile constant.
+
+=head2 C<forward( )>
+
+Returns the forward filehandle.
+
+=head1 LICENSE
+
+This software is Copyright (c) 2026 by Sanko Robinson.
+
+This is free software, licensed under:
+
+  The Artistic License 2.0 (GPL Compatible)
+
+See the F<LICENSE> file for full text.
+
+=head1 AUTHOR
+
+Sanko Robinson  L<https://github.com/sanko>
+
+=begin stopwords
+
+
+=end stopwords
+
+=cut

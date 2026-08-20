@@ -1,6 +1,6 @@
 use v5.42;
-
-package Cancer::CellBuf::Screen v0.0.1 {
+use experimental 'class';
+class Cancer::CellBuf::Screen v0.0.1 {
     use Cancer::Ansi qw[
         CursorUp CursorDown CursorForward CursorBackward CursorPosition
         EraseLineRight EraseLineLeft EraseScreenBelow EraseEntireScreen
@@ -17,6 +17,7 @@ package Cancer::CellBuf::Screen v0.0.1 {
     use Cancer::CellBuf::Link;
     use Cancer::CellBuf::Cell;
     use Cancer::CellBuf::Geom qw[Rect];
+    use Cancer::Util          qw[_max _min];
     use Carp                  qw[carp];
     use IO::Handle;
     use constant {
@@ -32,75 +33,68 @@ package Cancer::CellBuf::Screen v0.0.1 {
         NO_CAPS  => 0,
         ALL_CAPS => 0x1FF
     };
-
-    sub new ( $class, %args ) {
-        my $writer = delete $args{writer} // \*STDOUT;
-        my $width  = delete $args{width}  // 0;
-        my $height = delete $args{height} // 0;
-        my $opts   = delete $args{opts}   // {};
-        my $self   = bless {
-            w           => $writer,
-            buf         => '',
-            curbuf      => undef,
-            newbuf      => undef,
-            tabs        => undef,
-            touch       => {},
-            queue_above => [],
-            oldhash     => [],
-            newhash     => [],
-            hashtab     => [],
-            oldnum      => [],
-            cur_style   => Cancer::CellBuf::Style->new,
-            cur_link    => Cancer::CellBuf::Link->new,
-            cur_x       => -1,
-            cur_y       => -1,
-            saved_x     => -1,
-            saved_y     => -1,
-            opts        => {
-                term            => $ENV{TERM} // '',
-                relative_cursor => 0,
-                alt_screen      => 0,
-                show_cursor     => 1,
-                hard_tabs       => 0,
-                backspace       => 0,
-                map_nl          => 0,
-                %{$opts}
-            },
-            method          => undef,
-            scroll_height   => 0,
-            alt_screen_mode => 0,
-            cursor_hidden   => 0,
-            clear           => 1,
-            caps            => NO_CAPS,
-            queued_text     => 0,
-            at_phantom      => 0
-        }, $class;
-
-        # Try to get terminal size if not provided
+    field $writer : param = \*STDOUT;
+    field $width  : param = 0;
+    field $height : param = 0;
+    field $opts   : param = {};
+    field $buf             = '';
+    field $curbuf          = undef;
+    field $newbuf          = undef;
+    field $tabs            = undef;
+    field $touch : reader  = {};
+    field $queue_above     = [];
+    field $oldhash         = [];
+    field $newhash         = [];
+    field $hashtab         = [];
+    field $oldnum          = [];
+    field $cur_style       = Cancer::CellBuf::Style->new;
+    field $cur_link        = Cancer::CellBuf::Link->new;
+    field $cur_x           = -1;
+    field $cur_y           = -1;
+    field $saved_x         = -1;
+    field $saved_y         = -1;
+    field $scroll_height   = 0;
+    field $alt_screen_mode = 0;
+    field $cursor_hidden   = 0;
+    field $clear           = 1;
+    field $caps            = NO_CAPS;
+    field $queued_text     = 0;
+    field $at_phantom      = 0;
+    ADJUST {
+        my $term_opts = {
+            term            => $ENV{TERM} // '',
+            relative_cursor => 0,
+            alt_screen      => 0,
+            show_cursor     => 1,
+            hard_tabs       => 0,
+            backspace       => 0,
+            map_nl          => 0,
+            %$opts
+        };
+        $opts = $term_opts;
         if ( $width <= 0 || $height <= 0 ) {
             if ( ref $writer eq 'GLOB' || ( ref $writer && $writer->can('fileno') ) ) {
                 my $size = _get_terminal_size($writer);
                 ( $width, $height ) = @$size if $size;
             }
         }
-        $width          = 0 if $width < 0;
-        $height         = 0 if $height < 0;
-        $self->{caps}   = _xterm_caps( $self->{opts}{term} );
-        $self->{curbuf} = Cancer::CellBuf::Buffer->new( width => $width, height => $height );
-        $self->{newbuf} = Cancer::CellBuf::Buffer->new( width => $width, height => $height );
+        $width  = 0 if $width < 0;
+        $height = 0 if $height < 0;
+        $caps   = _xterm_caps( $opts->{term} );
+        $curbuf = Cancer::CellBuf::Buffer->new( width => $width, height => $height );
+        $newbuf = Cancer::CellBuf::Buffer->new( width => $width, height => $height );
         $self->_reset;
-        return $self;
     }
-    sub width  ($self)           { $self->{newbuf}->width }
-    sub height ($self)           { $self->{newbuf}->height }
-    sub bounds ($self)           { $self->{newbuf}->bounds }
-    sub cell   ( $self, $x, $y ) { $self->{newbuf}->cell( $x, $y ) }
+    method width ()        { $newbuf->width }
+    method height ()       { $newbuf->height }
+    method bounds ()       { $newbuf->bounds }
+    method cell ( $x, $y ) { $newbuf->cell( $x, $y ) }
 
-    sub set_cell ( $self, $x, $y, $cell ) {
+    method set_cell ( $x, $y, $cell ) {
         my $cell_width = defined $cell ? $cell->width : 1;
-        my $prev       = $self->{curbuf}->cell( $x, $y );
+        my $prev       = $curbuf->cell( $x, $y );
         if ( !_cell_equal( $prev, $cell ) ) {
-            my $chg = $self->{touch}{$y};
+            my $chg = $touch->{$y};
             if ( !defined $chg ) {
                 $chg = { first_cell => $x, last_cell => $x + $cell_width };
             }
@@ -108,308 +102,242 @@ package Cancer::CellBuf::Screen v0.0.1 {
                 $chg->{first_cell} = $x               if $x < $chg->{first_cell};
                 $chg->{last_cell}  = $x + $cell_width if $x + $cell_width > $chg->{last_cell};
             }
-            $self->{touch}{$y} = $chg;
+            $touch->{$y} = $chg;
         }
-        return $self->{newbuf}->set_cell( $x, $y, $cell );
+        return $newbuf->set_cell( $x, $y, $cell );
     }
+    method fill ($cell) { return $self->fill_rect( $cell, $self->bounds ) }
 
-    sub fill ( $self, $cell ) {
-        return $self->fill_rect( $cell, $self->bounds );
-    }
-
-    sub fill_rect ( $self, $cell, $rect ) {
-        $self->{newbuf}->fill_rect( $cell, $rect );
-        for my $y ( $rect->min->y .. $rect->max->y - 1 ) {
-            $self->{touch}{$y} = { first_cell => $rect->min->x, last_cell => $rect->max->x };
+    method fill_rect ( $cell, $rect ) {
+        $newbuf->fill_rect( $cell, $rect );
+        for my $y ( $rect->min_y .. $rect->max_y - 1 ) {
+            $touch->{$y} = { first_cell => $rect->min_x, last_cell => $rect->max_x };
         }
         return 1;
     }
-    sub clear       ($self)          { $self->clear_rect( $self->bounds ) }
-    sub clear_rect  ( $self, $rect ) { $self->fill_rect( undef, $rect ) }
-    sub redraw      ($self)          { $self->{clear}             = 1 }
-    sub show_cursor ($self)          { $self->{opts}{show_cursor} = 1 }
-    sub hide_cursor ($self)          { $self->{opts}{show_cursor} = 0 }
+    method clear ()           { $self->clear_rect( $self->bounds ) }
+    method clear_rect ($rect) { $self->fill_rect( undef, $rect ) }
+    method redraw ()          { $clear               = 1 }
+    method show_cursor ()     { $opts->{show_cursor} = 1 }
+    method hide_cursor ()     { $opts->{show_cursor} = 0 }
 
-    sub enter_alt_screen ($self) {
-        $self->{opts}{alt_screen} = 1;
-        $self->{clear}            = 1;
-        $self->{saved_x}          = $self->{cur_x};
-        $self->{saved_y}          = $self->{cur_y};
+    method enter_alt_screen () {
+        $opts->{alt_screen} = 1;
+        $clear              = 1;
+        $saved_x            = $cur_x;
+        $saved_y            = $cur_y;
     }
 
-    sub exit_alt_screen ($self) {
-        $self->{opts}{alt_screen} = 0;
-        $self->{clear}            = 1;
-        $self->{cur_x}            = $self->{saved_x};
-        $self->{cur_y}            = $self->{saved_y};
+    method exit_alt_screen () {
+        $opts->{alt_screen} = 0;
+        $clear              = 1;
+        $cur_x              = $saved_x;
+        $cur_y              = $saved_y;
     }
 
-    sub resize ( $self, $width, $height ) {
-        my $old_width  = $self->{newbuf}->width;
-        my $old_height = $self->{newbuf}->height;
-        $self->{clear} = 1 if $self->{opts}{alt_screen} || $width != $old_width;
-
-        # Clear new columns/lines
-        if ( $width > $old_width ) {
-            $self->clear_rect( Rect( $old_width - 1, 0, $width - $old_width, $height ) );
+    method resize ( $new_width, $new_height ) {
+        my $old_width  = $newbuf->width;
+        my $old_height = $newbuf->height;
+        $clear = 1 if $opts->{alt_screen} || $new_width != $old_width;
+        if ( $new_width > $old_width ) {
+            $self->clear_rect( Rect( $old_width - 1, 0, $new_width - $old_width, $new_height ) );
         }
-        elsif ( $width < $old_width ) {
-            $self->clear_rect( Rect( $width - 1, 0, $old_width - $width, $height ) );
+        elsif ( $new_width < $old_width ) {
+            $self->clear_rect( Rect( $new_width - 1, 0, $old_width - $new_width, $new_height ) );
         }
-        if ( $height > $old_height ) {
-            $self->clear_rect( Rect( 0, $old_height, $width, $height - $old_height ) );
+        if ( $new_height > $old_height ) {
+            $self->clear_rect( Rect( 0, $old_height, $new_width, $new_height - $old_height ) );
         }
-        elsif ( $height < $old_height ) {
-            $self->clear_rect( Rect( 0, $height, $width, $old_height - $height ) );
+        elsif ( $new_height < $old_height ) {
+            $self->clear_rect( Rect( 0, $new_height, $new_width, $old_height - $new_height ) );
         }
-        $self->{newbuf}->resize( $width, $height );
-        $self->{tabs}->resize($width);
-        $self->{oldhash}       = [];
-        $self->{newhash}       = [];
-        $self->{scroll_height} = 0;
+        $newbuf->resize( $new_width, $new_height );
+        $tabs->resize($new_width);
+        $oldhash       = [];
+        $newhash       = [];
+        $scroll_height = 0;
         return 1;
     }
 
-    sub render ($self) {
+    method render () {
         return unless $self->_needs_render;
-
-        # Handle alt screen mode
-        if ( $self->{opts}{alt_screen} != $self->{alt_screen_mode} ) {
-            if ( $self->{opts}{alt_screen} ) {
-                $self->{buf} .= set_mode(ModeAltScreenSaveCursor);
-            }
-            else {
-                $self->{buf} .= reset_mode(ModeAltScreenSaveCursor);
-            }
-            $self->{alt_screen_mode} = $self->{opts}{alt_screen};
+        if ( $opts->{alt_screen} != $alt_screen_mode ) {
+            $buf .= $opts->{alt_screen} ? set_mode(ModeAltScreenSaveCursor) : reset_mode(ModeAltScreenSaveCursor);
+            $alt_screen_mode = $opts->{alt_screen};
         }
-
-        # Handle cursor visibility
-        if ( ( !$self->{opts}{show_cursor} ) != $self->{cursor_hidden} ) {
-            $self->{cursor_hidden} = !$self->{opts}{show_cursor};
-            $self->{buf} .= HideCursor() if $self->{cursor_hidden};
+        if ( ( !$opts->{show_cursor} ) != $cursor_hidden ) {
+            $cursor_hidden = !$opts->{show_cursor};
+            $buf .= HideCursor() if $cursor_hidden;
         }
-
-        # Handle queued above
-        if ( @{ $self->{queue_above} } ) {
-            $self->_move( 0, $self->{newbuf}->height - 1 );
-            $self->{buf} .= "\n" x scalar @{ $self->{queue_above} };
-            $self->{cur_y} += scalar @{ $self->{queue_above} };
+        if (@$queue_above) {
+            $self->_move( 0, $newbuf->height - 1 );
+            $buf .= "\n" x scalar @$queue_above;
+            $cur_y += scalar @$queue_above;
             $self->_move_cursor( 0, 0, 0 );
-            $self->{buf} .= InsertLine( scalar @{ $self->{queue_above} } );
-            for my $line ( @{ $self->{queue_above} } ) {
-                $self->{buf} .= $line . "\r\n";
-            }
-            $self->{queue_above} = [];
+            $buf .= InsertLine( scalar @$queue_above );
+            for my $line (@$queue_above) { $buf .= $line . "\r\n" }
+            $queue_above = [];
         }
         my $non_empty;
         my $partial_clear
-            = !$self->{opts}{alt_screen}                     &&
-            $self->{cur_x} != -1                             &&
-            $self->{cur_y} != -1                             &&
-            $self->{curbuf}->width == $self->{newbuf}->width &&
-            $self->{curbuf}->height > $self->{newbuf}->height;
-        if ( !$self->{clear} && $partial_clear ) {
-            $self->_clear_below( undef, $self->{newbuf}->height - 1 );
-        }
-        if ( $self->{clear} ) {
-            $self->_clear_update;
-            $self->{clear} = 0;
-        }
-        elsif ( %{ $self->{touch} } ) {
-            if ( $self->{opts}{alt_screen} ) {
-                $self->_scroll_optimize;
-            }
-            $non_empty = $self->{opts}{alt_screen} ? _min( $self->{curbuf}->height, $self->{newbuf}->height ) : $self->{newbuf}->height;
+            = !$opts->{alt_screen} && $cur_x != -1 && $cur_y != -1 && $curbuf->width == $newbuf->width && $curbuf->height > $newbuf->height;
+        if    ( !$clear && $partial_clear ) { $self->_clear_below( undef, $newbuf->height - 1 ) }
+        if    ($clear)                      { $self->_clear_update; $clear = 0 }
+        elsif (%$touch) {
+            $self->_scroll_optimize if $opts->{alt_screen};
+            $non_empty = $opts->{alt_screen} ? _min( $curbuf->height, $newbuf->height ) : $newbuf->height;
             $non_empty = $self->_clear_bottom($non_empty);
             for my $i ( 0 .. $non_empty - 1 ) {
-                if ( exists $self->{touch}{$i} ) {
-                    $self->_transform_line($i);
-                }
+                $self->_transform_line($i) if exists $touch->{$i};
             }
         }
-
-        # Sync buffers
-        $self->{touch} = {};
-        if ( $self->{curbuf}->width != $self->{newbuf}->width || $self->{curbuf}->height != $self->{newbuf}->height ) {
-            my $old_h = $self->{curbuf}->height;
-            $self->{curbuf}->resize( $self->{newbuf}->width, $self->{newbuf}->height );
-            for my $i ( $old_h .. $self->{newbuf}->height - 1 ) {
-                $self->{curbuf}{lines}[$i] = $self->{newbuf}{lines}[$i] if defined $self->{newbuf}{lines}[$i];
+        $touch = {};
+        if ( $curbuf->width != $newbuf->width || $curbuf->height != $newbuf->height ) {
+            my $old_h = $curbuf->height;
+            $curbuf->resize( $newbuf->width, $newbuf->height );
+            for my $i ( $old_h .. $newbuf->height - 1 ) {
+                $curbuf->{lines}[$i] = $newbuf->{lines}[$i] if defined $newbuf->{lines}[$i];
             }
         }
         $self->_update_pen(undef);
-
-        # Handle cursor flicker reduction
-        if ( length $self->{buf} > 1 && $self->{opts}{show_cursor} && !$self->{cursor_hidden} && $self->{queued_text} ) {
-            $self->{buf} = HideCursor() . $self->{buf} . ShowCursor();
+        if ( length $buf > 1 && $opts->{show_cursor} && !$cursor_hidden && $queued_text ) {
+            $buf = HideCursor() . $buf . ShowCursor();
         }
-        $self->{queued_text} = 0;
+        $queued_text = 0;
     }
 
-    sub flush ($self) {
+    method flush () {
         $self->render;
-        if ( length $self->{buf} > 0 ) {
-            if ( ref $self->{w} && $self->{w}->can('print') ) {
-                $self->{w}->print( $self->{buf} );
-            }
-            else {
-                print { $self->{w} } $self->{buf};
-            }
-            $self->{buf} = '';
+        if ( length $buf > 0 ) {
+            if   ( ref $writer && $writer->can('print') ) { $writer->print($buf) }
+            else                                          { print {$writer} $buf }
+            $buf = '';
         }
     }
 
-    sub close ($self) {
+    method close () {
         $self->render;
         $self->_update_pen(undef);
-        $self->_move( 0, $self->{newbuf}->height - 1 );
-        if ( $self->{alt_screen_mode} ) {
-            $self->{buf} .= reset_mode(ModeAltScreenSaveCursor);
-            $self->{alt_screen_mode} = 0;
-        }
-        if ( $self->{cursor_hidden} ) {
-            $self->{buf} .= ShowCursor();
-            $self->{cursor_hidden} = 0;
-        }
+        $self->_move( 0, $newbuf->height - 1 );
+        if ($alt_screen_mode) { $buf .= reset_mode(ModeAltScreenSaveCursor); $alt_screen_mode = 0 }
+        if ($cursor_hidden)   { $buf .= ShowCursor();                        $cursor_hidden   = 0 }
         $self->flush;
         $self->_reset;
     }
+    method move_to ( $x, $y ) { $self->_move( $x, $y ) }
 
-    sub move_to ( $self, $x, $y ) {
-        $self->_move( $x, $y );
-    }
-
-    sub insert_above ( $self, $str ) {
-        return if $self->{opts}{alt_screen};
+    method insert_above ($str) {
+        return if $opts->{alt_screen};
         for my $line ( split /\n/, $str ) {
-
-            # Truncate line to width (simplified)
             my $w = $self->width;
             $line = substr( $line, 0, $w ) if length($line) > $w;
-            push @{ $self->{queue_above} }, $line;
+            push @$queue_above, $line;
         }
     }
 
-    # --- Internal methods ---
-    sub _reset ($self) {
-        $self->{scroll_height}   = 0;
-        $self->{cursor_hidden}   = 0;
-        $self->{alt_screen_mode} = 0;
-        $self->{touch}           = {};
-        $self->{curbuf}->clear if $self->{curbuf};
-        $self->{newbuf}->clear if $self->{newbuf};
-        $self->{buf}             = '';
-        $self->{tabs}            = Cancer::CellBuf::TabStops->default( $self->{newbuf}->width ) if $self->{newbuf};
-        $self->{oldhash}         = [];
-        $self->{newhash}         = [];
-        $self->{caps}            = _xterm_caps( $self->{opts}{term} ) if $self->{opts}{term} =~ /^linux/;
-        $self->{opts}{hard_tabs} = 0                                  if $self->{opts}{term} =~ /^linux/;
+    method _reset () {
+        $scroll_height   = 0;
+        $cursor_hidden   = 0;
+        $alt_screen_mode = 0;
+        $touch           = {};
+        $curbuf->clear if $curbuf;
+        $newbuf->clear if $newbuf;
+        $buf               = '';
+        $tabs              = Cancer::CellBuf::TabStops->default( $newbuf->width ) if $newbuf;
+        $oldhash           = [];
+        $newhash           = [];
+        $caps              = _xterm_caps( $opts->{term} ) if $opts->{term} =~ /^linux/;
+        $opts->{hard_tabs} = 0                            if $opts->{term} =~ /^linux/;
     }
 
-    sub _needs_render ($self) {
-        return 0
-            if $self->{opts}{alt_screen} == $self->{alt_screen_mode}  &&
-            ( !$self->{opts}{show_cursor} ) == $self->{cursor_hidden} &&
-            !$self->{clear}                                           &&
-            !%{ $self->{touch} }                                      &&
-            !@{ $self->{queue_above} };
+    method _needs_render () {
+        return 0 if $opts->{alt_screen} == $alt_screen_mode && ( !$opts->{show_cursor} ) == $cursor_hidden && !$clear && !%$touch && !@$queue_above;
         return 1;
     }
 
-    sub _clear_blank ($self) {
-        my $c = Cancer::CellBuf::Cell::BlankCell->clone;
-        if ( !$self->{cur_style}->empty || !$self->{cur_link}->empty ) {
-            $c->{style} = $self->{cur_style}->clone;
-            $c->{link}  = $self->{cur_link}->clone;
+    method _clear_blank () {
+        my $c = Cancer::CellBuf::Cell->BlankCell->clone;
+        if ( !$cur_style->empty || !$cur_link->empty ) {
+            $c->set_style( $cur_style->clone );
+            $c->set_link( $cur_link->clone );
         }
         return $c;
     }
 
-    sub _update_pen ( $self, $cell ) {
-        $cell //= Cancer::CellBuf::Cell::BlankCell;
+    method _update_pen ($cell) {
+        $cell //= Cancer::CellBuf::Cell->BlankCell;
         my $style = $cell->style // Cancer::CellBuf::Style->new;
         my $link  = $cell->link  // Cancer::CellBuf::Link->new;
-        if ( !$style->equal( $self->{cur_style} ) ) {
-            my $seq = $style->diff_sequence( $self->{cur_style} );
+        if ( !$style->equal($cur_style) ) {
+            my $seq = $style->diff_sequence($cur_style);
             $seq = ResetStyle() if $style->empty && length($seq) > length( ResetStyle() );
-            $self->{buf} .= $seq;
-            $self->{cur_style} = $style->clone;
+            $buf .= $seq;
+            $cur_style = $style->clone;
         }
-        if ( !$link->equal( $self->{cur_link} ) ) {
-            $self->{buf} .= set_hyperlink( $link->url, $link->params );
-            $self->{cur_link} = $link->clone;
+        if ( !$link->equal($cur_link) ) {
+            $buf .= set_hyperlink( $link->url, $link->params );
+            $cur_link = $link->clone;
         }
     }
 
-    sub _move ( $self, $x, $y ) {
-        my $width  = _max( $self->{newbuf}->width,  $self->{curbuf}->width );
-        my $height = _max( $self->{newbuf}->height, $self->{curbuf}->height );
-        if ( $width > 0 && $x >= $width ) {
-            $y += int( $x / $width );
-            $x %= $width;
-        }
-        $y = $height - 1 if $height > 0 && $y > $height - 1;
-        $y = 0           if $y < 0;
-        $x = 0           if $x < 0;
-        return if $x == $self->{cur_x} && $y == $self->{cur_y};
+    method _move ( $x, $y ) {
+        my $w = _max( $newbuf->width,  $curbuf->width );
+        my $h = _max( $newbuf->height, $curbuf->height );
+        if ( $w > 0 && $x >= $w ) { $y += int( $x / $w ); $x %= $w }
+        $y = $h - 1 if $h > 0 && $y > $h - 1;
+        $y = 0      if $y < 0;
+        $x = 0      if $x < 0;
+        return if $x == $cur_x && $y == $cur_y;
         $self->_move_cursor( $x, $y, 1 );
     }
 
-    sub _move_cursor ( $self, $x, $y, $overwrite ) {
-        if ( !$self->{opts}{alt_screen} && $self->{cur_x} == -1 && $self->{cur_y} == -1 ) {
-            $self->{buf} .= "\r";
-            $self->{cur_x} = 0;
-            $self->{cur_y} = 0;
+    method _move_cursor ( $x, $y, $overwrite ) {
+        if ( !$opts->{alt_screen} && $cur_x == -1 && $cur_y == -1 ) {
+            $buf .= "\r";
+            $cur_x = 0;
+            $cur_y = 0;
         }
-        my $seq = _relative_cursor_move( $self, $self->{cur_x}, $self->{cur_y}, $x, $y, $overwrite );
-        $self->{buf} .= $seq;
-        $self->{cur_x} = $x;
-        $self->{cur_y} = $y;
+        my $seq = _relative_cursor_move( $self, $cur_x, $cur_y, $x, $y, $overwrite );
+        $buf .= $seq;
+        $cur_x = $x;
+        $cur_y = $y;
     }
 
-    sub _relative_cursor_move ( $self, $fx, $fy, $tx, $ty, $overwrite ) {
+    method _relative_cursor_move ( $fx, $fy, $tx, $ty, $overwrite ) {
         my $seq = '';
         if ( $ty != $fy ) {
             my $yseq = '';
             if ( $ty > $fy ) {
-                my $n   = $ty - $fy;
-                my $cud = CursorDown($n);
-                $yseq = $cud;
-                my $should_scroll = !$self->{opts}{alt_screen} && $fy + $n >= $self->{scroll_height};
+                my $n = $ty - $fy;
+                $yseq = CursorDown($n);
+                my $should_scroll = !$opts->{alt_screen} && $fy + $n >= $scroll_height;
                 my $lf            = "\n" x $n;
-                if ( $should_scroll || ( $fy + $n < $self->{newbuf}->height && length($lf) < length($yseq) ) ) {
-                    $yseq                  = $lf;
-                    $self->{scroll_height} = _max( $self->{scroll_height}, $fy + $n );
-                    $fx                    = 0 if $self->{opts}{map_nl};
+                if ( $should_scroll || ( $fy + $n < $newbuf->height && length($lf) < length($yseq) ) ) {
+                    $yseq          = $lf;
+                    $scroll_height = _max( $scroll_height, $fy + $n );
+                    $fx            = 0 if $opts->{map_nl};
                 }
             }
             elsif ( $ty < $fy ) {
-                my $n   = $fy - $ty;
-                my $cuu = CursorUp($n);
-                $yseq = $cuu;
-                if ( $n == 1 && $fy - 1 > 0 ) {
-                    $yseq = ReverseIndex();
-                }
+                my $n = $fy - $ty;
+                $yseq = CursorUp($n);
+                $yseq = ReverseIndex() if $n == 1 && $fy - 1 > 0;
             }
             $seq .= $yseq;
         }
         if ( $tx != $fx ) {
             my $xseq = '';
             if ( $tx > $fx ) {
-                my $n   = $tx - $fx;
-                my $cuf = CursorForward($n);
-                $xseq = $cuf;
-
-                # Try overwrite optimization
+                my $n = $tx - $fx;
+                $xseq = CursorForward($n);
                 if ( $overwrite && $ty >= 0 ) {
                     my $ovw           = '';
                     my $can_overwrite = 1;
                     for my $i ( 0 .. $n - 1 ) {
-                        my $cell = $self->{newbuf}->cell( $fx + $i, $ty );
+                        my $cell = $newbuf->cell( $fx + $i, $ty );
                         if ( defined $cell && $cell->width > 0 ) {
                             $i += $cell->width - 1;
-                            if ( !_style_equal( $cell->style, $self->{cur_style} ) || !_link_equal( $cell->link, $self->{cur_link} ) ) {
+                            if ( !_style_equal( $cell->style, $cur_style ) || !_link_equal( $cell->link, $cur_link ) ) {
                                 $can_overwrite = 0;
                                 last;
                             }
@@ -417,105 +345,81 @@ package Cancer::CellBuf::Screen v0.0.1 {
                     }
                     if ( $can_overwrite && $ty >= 0 ) {
                         for my $i ( 0 .. $n - 1 ) {
-                            my $cell = $self->{newbuf}->cell( $fx + $i, $ty );
+                            my $cell = $newbuf->cell( $fx + $i, $ty );
                             if ( defined $cell && $cell->width > 0 ) {
                                 $ovw .= $cell->string;
                                 $i += $cell->width - 1;
                             }
-                            else {
-                                $ovw .= ' ';
-                            }
+                            else { $ovw .= ' ' }
                         }
                         $xseq = $ovw if length($ovw) < length($xseq);
                     }
                 }
             }
             elsif ( $tx < $fx ) {
-                my $n   = $fx - $tx;
-                my $cub = CursorBackward($n);
-                $xseq = $cub;
-                if ( $self->{opts}{backspace} && $n < length($xseq) ) {
-                    $xseq = "\b" x $n;
-                }
+                my $n = $fx - $tx;
+                $xseq = CursorBackward($n);
+                $xseq = "\b" x $n if $opts->{backspace} && $n < length($xseq);
             }
             $seq .= $xseq;
         }
         return $seq;
     }
 
-    sub _clear_to_end ( $self, $blank, $force ) {
-        if ( $self->{cur_y} >= 0 ) {
-            my $curline = $self->{curbuf}->line( $self->{cur_y} );
+    method _clear_to_end ( $blank, $force ) {
+        if ( $cur_y >= 0 ) {
+            my $curline = $curbuf->line($cur_y);
             if ($curline) {
-                for my $j ( $self->{cur_x} .. $self->{curbuf}->width - 1 ) {
+                for my $j ( $cur_x .. $curbuf->width - 1 ) {
                     if ( $j >= 0 ) {
                         my $c = $curline->at($j);
-                        if ( !_cell_equal( $c, $blank ) ) {
-                            $curline->set( $j, $blank );
-                            $force = 1;
-                        }
+                        if ( !_cell_equal( $c, $blank ) ) { $curline->set( $j, $blank ); $force = 1 }
                     }
                 }
             }
         }
-        if ($force) {
-            $self->_update_pen($blank);
-            my $count = $self->{newbuf}->width - $self->{cur_x};
-            $self->{buf} .= EraseLineRight();
-        }
+        if ($force) { $self->_update_pen($blank); $buf .= EraseLineRight() }
     }
 
-    sub _clear_to_bottom ( $self, $blank ) {
-        my $row = $self->{cur_y};
+    method _clear_to_bottom ($blank) {
+        my $row = $cur_y;
         $row = 0 if $row < 0;
         $self->_update_pen($blank);
-        $self->{buf} .= EraseScreenBelow();
-        $self->{curbuf}->clear_rect( Rect( $self->{cur_x}, $row,     $self->{curbuf}->width - $self->{cur_x}, 1 ) );
-        $self->{curbuf}->clear_rect( Rect( 0,              $row + 1, $self->{curbuf}->width,                  $self->{curbuf}->height - $row - 1 ) );
+        $buf .= EraseScreenBelow();
+        $curbuf->clear_rect( Rect( $cur_x, $row,     $curbuf->width - $cur_x, 1 ) );
+        $curbuf->clear_rect( Rect( 0,      $row + 1, $curbuf->width,          $curbuf->height - $row - 1 ) );
     }
+    method _clear_below ( $blank, $row ) { $self->_move( 0, $row ); $self->_clear_to_bottom($blank) }
 
-    sub _clear_below ( $self, $blank, $row ) {
-        $self->_move( 0, $row );
-        $self->_clear_to_bottom($blank);
-    }
-
-    sub _clear_screen ( $self, $blank ) {
+    method _clear_screen ($blank) {
         $self->_update_pen($blank);
-        $self->{buf} .= CursorHomePosition() . EraseEntireScreen();
-        $self->{cur_x} = 0;
-        $self->{cur_y} = 0;
-        $self->{curbuf}->fill($blank);
+        $buf .= CursorHomePosition() . EraseEntireScreen();
+        $cur_x = 0;
+        $cur_y = 0;
+        $curbuf->fill($blank);
     }
 
-    sub _clear_bottom ( $self, $total ) {
+    method _clear_bottom ($total) {
         return 0 if $total <= 0;
         my $top       = $total;
         my $blank     = $self->_clear_blank;
         my $can_clear = !$blank || $blank->clear;
         if ($can_clear) {
             for my $row ( reverse 0 .. $total - 1 ) {
-                my $old_line = $self->{curbuf}->line($row);
-                my $new_line = $self->{newbuf}->line($row);
+                my $old_line = $curbuf->line($row);
+                my $new_line = $newbuf->line($row);
                 my $ok       = 1;
-                for my $col ( 0 .. $self->{newbuf}->width - 1 ) {
-                    $ok = _cell_equal( $new_line->at($col), $blank );
-                    last unless $ok;
-                }
-                if ( !$ok ) {
-                    last;
-                }
-                for my $col ( 0 .. $self->{newbuf}->width - 1 ) {
-                    $ok = _cell_equal( $old_line->at($col), $blank );
-                    last unless $ok;
-                }
+                for my $col ( 0 .. $newbuf->width - 1 ) { $ok = _cell_equal( $new_line->at($col), $blank ); last unless $ok }
+                last unless $ok;
+                for my $col ( 0 .. $newbuf->width - 1 ) { $ok = _cell_equal( $old_line->at($col), $blank ); last unless $ok }
                 $top = $row if !$ok;
             }
             if ( $top < $total ) {
                 $self->_move( 0, $top - 1 );
                 $self->_clear_to_bottom($blank);
-                if ( @{ $self->{oldhash} } && @{ $self->{newhash} } ) {
-                    for my $row ( $top .. $self->{newbuf}->height - 1 ) {
-                        $self->{oldhash}[$row] = $self->{newhash}[$row] if defined $self->{newhash}[$row];
+                if ( @$oldhash && @$newhash ) {
+                    for my $row ( $top .. $newbuf->height - 1 ) {
+                        $oldhash->[$row] = $newhash->[$row] if defined $newhash->[$row];
                     }
                 }
             }
@@ -523,73 +427,56 @@ package Cancer::CellBuf::Screen v0.0.1 {
         return $top;
     }
 
-    sub _clear_update ($self) {
+    method _clear_update () {
         my $blank = $self->_clear_blank;
         my $non_empty;
-        if ( $self->{opts}{alt_screen} ) {
-            $non_empty = _max( $self->{curbuf}->height, $self->{newbuf}->height );
+        if ( $opts->{alt_screen} ) {
+            $non_empty = _max( $curbuf->height, $newbuf->height );
             $self->_clear_screen($blank);
         }
         else {
-            $non_empty = $self->{newbuf}->height;
+            $non_empty = $newbuf->height;
             $self->_clear_below( $blank, 0 );
         }
         $non_empty = $self->_clear_bottom($non_empty);
-        for my $i ( 0 .. $non_empty - 1 ) {
-            $self->_transform_line($i);
-        }
+        $self->_transform_line($_) for 0 .. $non_empty - 1;
     }
 
-    sub _transform_line ( $self, $y ) {
-        my $old_line = $self->{curbuf}->line($y);
-        my $new_line = $self->{newbuf}->line($y);
+    method _transform_line ($y) {
+        my $old_line = $curbuf->line($y);
+        my $new_line = $newbuf->line($y);
         return unless $old_line && $new_line;
-
-        # Find first changed cell
         my $first_cell   = 0;
         my $line_changed = 0;
-        for my $i ( 0 .. $self->{newbuf}->width - 1 ) {
-            if ( !_cell_equal( $new_line->at($i), $old_line->at($i) ) ) {
-                $line_changed = 1;
-                last;
-            }
+        for my $i ( 0 .. $newbuf->width - 1 ) {
+            if ( !_cell_equal( $new_line->at($i), $old_line->at($i) ) ) { $line_changed = 1; last }
             $first_cell++;
         }
         return unless $line_changed;
-
-        # Find last changed cell
-        my $last_cell = $self->{newbuf}->width - 1;
+        my $last_cell = $newbuf->width - 1;
         while ( $last_cell > $first_cell && _cell_equal( $new_line->at($last_cell), $old_line->at($last_cell) ) ) {
             $last_cell--;
         }
         if ( $last_cell >= $first_cell ) {
             $self->_move( $first_cell, $y );
             $self->_put_range( $old_line, $new_line, $y, $first_cell, $last_cell );
-
-            # Update old line
-            for my $i ( $first_cell .. $last_cell ) {
-                $old_line->set( $i, $new_line->at($i) );
-            }
+            for my $i ( $first_cell .. $last_cell ) { $old_line->set( $i, $new_line->at($i) ) }
         }
     }
 
-    sub _put_range ( $self, $old_line, $new_line, $y, $start, $end ) {
+    method _put_range ( $old_line, $new_line, $y, $start, $end ) {
         for my $j ( $start .. $end ) {
-            my $old_cell = $old_line->at($j);
-            my $new_cell = $new_line->at($j);
-            unless ( _cell_equal( $old_cell, $new_cell ) ) {
-                $self->_put_cell($new_cell);
+            if ( !_cell_equal( $old_line->at($j), $new_line->at($j) ) ) {
+                $self->_put_cell( $new_line->at($j) );
             }
             else {
-                $self->_move( $j, $y ) if $j != $self->{cur_x};
+                $self->_move( $j, $y ) if $j != $cur_x;
             }
         }
     }
 
-    sub _put_cell ( $self, $cell ) {
-        my $width  = $self->{newbuf}->width;
-        my $height = $self->{newbuf}->height;
-        if ( $self->{opts}{alt_screen} && $self->{cur_x} == $width - 1 && $self->{cur_y} == $height - 1 ) {
+    method _put_cell ($cell) {
+        if ( $opts->{alt_screen} && $cur_x == $newbuf->width - 1 && $cur_y == $newbuf->height - 1 ) {
             $self->_put_cell_lr($cell);
         }
         else {
@@ -597,39 +484,32 @@ package Cancer::CellBuf::Screen v0.0.1 {
         }
     }
 
-    sub _put_attr_cell ( $self, $cell ) {
+    method _put_attr_cell ($cell) {
         return if defined $cell && $cell->empty;
         $cell = $self->_clear_blank unless defined $cell;
-        if ( $self->{at_phantom} ) {
-            $self->{cur_x} = 0;
-            $self->{cur_y}++;
-            $self->{at_phantom} = 0;
-        }
+        if ($at_phantom) { $cur_x = 0; $cur_y++; $at_phantom = 0 }
         $self->_update_pen($cell);
-        $self->{buf} .= $cell->string;
-        $self->{cur_x} += $cell->width;
-        $self->{queued_text} = 1 if $cell->width > 0;
-        $self->{at_phantom}  = 1 if $self->{cur_x} >= $self->{newbuf}->width;
+        $buf .= $cell->string;
+        $cur_x += $cell->width;
+        $queued_text = 1 if $cell->width > 0;
+        $at_phantom  = 1 if $cur_x >= $newbuf->width;
     }
 
-    sub _put_cell_lr ( $self, $cell ) {
-        my $cur_x = $self->{cur_x};
+    method _put_cell_lr ($cell) {
+        my $saved_cur_x = $cur_x;
         if ( !defined $cell || !$cell->empty ) {
-            $self->{buf} .= reset_mode(ModeAutoWrap);
+            $buf .= reset_mode(ModeAutoWrap);
             $self->_put_attr_cell($cell);
-            $self->{at_phantom} = 0;
-            $self->{cur_x}      = $cur_x;
-            $self->{buf} .= set_mode(ModeAutoWrap);
+            $at_phantom = 0;
+            $cur_x      = $saved_cur_x;
+            $buf .= set_mode(ModeAutoWrap);
         }
     }
-
-    # --- Hashmap / scroll optimization ---
-    # newIndex sentinel: line was not matched in old buffer
     use constant newIndex => -1;
 
-    sub _hash ( $self, $line ) {
+    method _hash ($line) {
         my $h = 0;
-        for my $i ( 0 .. $self->{newbuf}->width - 1 ) {
+        for my $i ( 0 .. $newbuf->width - 1 ) {
             my $c = $line                      ? $line->at($i) : undef;
             my $r = ( defined $c && $c->rune ) ? $c->rune      : ord(' ');
             $h += ( $h << 5 ) + $r;
@@ -637,33 +517,29 @@ package Cancer::CellBuf::Screen v0.0.1 {
         return $h;
     }
 
-    sub _update_hashmap ($self) {
-        my $height = $self->{newbuf}->height;
-        if ( @{ $self->{oldhash} } >= $height && @{ $self->{newhash} } >= $height ) {
+    method _update_hashmap () {
+        my $height = $newbuf->height;
+        if ( @$oldhash >= $height && @$newhash >= $height ) {
             for my $i ( 0 .. $height - 1 ) {
-                if ( exists $self->{touch}{$i} ) {
-                    $self->{oldhash}[$i] = $self->_hash( $self->{curbuf}->line($i) );
-                    $self->{newhash}[$i] = $self->_hash( $self->{newbuf}->line($i) );
+                if ( exists $touch->{$i} ) {
+                    $oldhash->[$i] = $self->_hash( $curbuf->line($i) );
+                    $newhash->[$i] = $self->_hash( $newbuf->line($i) );
                 }
             }
         }
         else {
-            $self->{oldhash} = [];
-            $self->{newhash} = [];
+            $oldhash = [];
+            $newhash = [];
             for my $i ( 0 .. $height - 1 ) {
-                $self->{oldhash}[$i] = $self->_hash( $self->{curbuf}->line($i) );
-                $self->{newhash}[$i] = $self->_hash( $self->{newbuf}->line($i) );
+                $oldhash->[$i] = $self->_hash( $curbuf->line($i) );
+                $newhash->[$i] = $self->_hash( $newbuf->line($i) );
             }
         }
-
-        # Build hash table
         my @hashtab;
         for my $i ( 0 .. $height - 1 ) {
-            my $hv  = $self->{oldhash}[$i];
+            my $hv  = $oldhash->[$i];
             my $idx = 0;
-            while ( $idx < @hashtab && $hashtab[$idx]{value} != $hv ) {
-                $idx++;
-            }
+            while ( $idx < @hashtab && $hashtab[$idx]{value} != $hv ) { $idx++ }
             if ( $idx >= @hashtab ) {
                 $hashtab[$idx] = { value => $hv, oldcount => 0, newcount => 0, oldindex => 0, newindex => 0 };
             }
@@ -672,102 +548,73 @@ package Cancer::CellBuf::Screen v0.0.1 {
             $hashtab[$idx]{oldindex} = $i;
         }
         for my $i ( 0 .. $height - 1 ) {
-            my $hv  = $self->{newhash}[$i];
+            my $hv  = $newhash->[$i];
             my $idx = 0;
-            while ( $idx < @hashtab && $hashtab[$idx]{value} != $hv ) {
-                $idx++;
-            }
+            while ( $idx < @hashtab && $hashtab[$idx]{value} != $hv ) { $idx++ }
             if ( $idx >= @hashtab ) {
                 $hashtab[$idx] = { value => $hv, oldcount => 0, newcount => 0, oldindex => 0, newindex => 0 };
             }
             $hashtab[$idx]{value} = $hv;
             $hashtab[$idx]{newcount}++;
             $hashtab[$idx]{newindex} = $i;
-            $self->{oldnum}[$i] = newIndex;
+            $oldnum->[$i] = newIndex;
         }
-        $self->{hashtab} = \@hashtab;
-
-        # Mark line pair corresponding to unique hash pairs
-        for my $hsp ( @{ $self->{hashtab} } ) {
+        $hashtab = \@hashtab;
+        for my $hsp (@$hashtab) {
             next unless $hsp->{oldcount} == 1 && $hsp->{newcount} == 1 && $hsp->{oldindex} != $hsp->{newindex};
-            $self->{oldnum}[ $hsp->{newindex} ] = $hsp->{oldindex};
+            $oldnum->[ $hsp->{newindex} ] = $hsp->{oldindex};
         }
         $self->_grow_hunks;
-
-        # Eliminate bad or impossible shifts
         my $i = 0;
         while ( $i < $height ) {
-            while ( $i < $height && $self->{oldnum}[$i] == newIndex ) { $i++ }
+            while ( $i < $height && $oldnum->[$i] == newIndex ) { $i++ }
             last if $i >= $height;
             my $start = $i;
-            my $shift = $self->{oldnum}[$i] - $i;
+            my $shift = $oldnum->[$i] - $i;
             $i++;
-            while ( $i < $height && $self->{oldnum}[$i] != newIndex && $self->{oldnum}[$i] - $i == $shift ) {
-                $i++;
-            }
+            while ( $i < $height && $oldnum->[$i] != newIndex && $oldnum->[$i] - $i == $shift ) { $i++ }
             my $size = $i - $start;
             if ( $size < 3 || $size + _min( int( $size / 8 ), 2 ) < abs($shift) ) {
-                for my $j ( $start .. $i - 1 ) {
-                    $self->{oldnum}[$j] = newIndex;
-                }
+                $oldnum->[$_] = newIndex for $start .. $i - 1;
             }
         }
         $self->_grow_hunks;
     }
 
-    sub _grow_hunks ($self) {
-        my $height = $self->{newbuf}->height;
+    method _grow_hunks () {
+        my $height = $newbuf->height;
         my ( $back_limit, $back_ref_limit ) = ( 0, 0 );
         my $i = 0;
-        while ( $i < $height && $self->{oldnum}[$i] == newIndex ) { $i++ }
+        while ( $i < $height && $oldnum->[$i] == newIndex ) { $i++ }
         while ( $i < $height ) {
             my $start = $i;
-            my $shift = $self->{oldnum}[$i] - $i;
-
-            # Get forward limit
+            my $shift = $oldnum->[$i] - $i;
             $i = $start + 1;
-            while ( $i < $height && $self->{oldnum}[$i] != newIndex && $self->{oldnum}[$i] - $i == $shift ) {
-                $i++;
-            }
+            while ( $i < $height && $oldnum->[$i] != newIndex && $oldnum->[$i] - $i == $shift ) { $i++ }
             my $end = $i;
-            while ( $i < $height && $self->{oldnum}[$i] == newIndex ) { $i++ }
+            while ( $i < $height && $oldnum->[$i] == newIndex ) { $i++ }
             my $next_hunk     = $i;
             my $forward_limit = $i;
             my $forward_ref_limit;
-            if ( $i >= $height || $self->{oldnum}[$i] >= $i ) {
-                $forward_ref_limit = $i;
-            }
-            else {
-                $forward_ref_limit = $self->{oldnum}[$i];
-            }
-            $i = $start - 1;
+            if   ( $i >= $height || $oldnum->[$i] >= $i ) { $forward_ref_limit = $i }
+            else                                          { $forward_ref_limit = $oldnum->[$i] }
+            $i          = $start - 1;
+            $back_limit = $back_ref_limit + abs($shift) if $shift < 0;
 
-            # Grow back
-            if ( $shift < 0 ) {
-                $back_limit = $back_ref_limit + abs($shift);
-            }
             while ( $i >= $back_limit ) {
-                if ( $self->{newhash}[$i] == $self->{oldhash}[ $i + $shift ] || $self->_cost_effective( $i + $shift, $i, $shift < 0 ) ) {
-                    $self->{oldnum}[$i] = $i + $shift;
+                if ( $newhash->[$i] == $oldhash->[ $i + $shift ] || $self->_cost_effective( $i + $shift, $i, $shift < 0 ) ) {
+                    $oldnum->[$i] = $i + $shift;
                 }
-                else {
-                    last;
-                }
+                else {last}
                 $i--;
             }
-            $i = $end;
-
-            # Grow forward
-            if ( $shift > 0 ) {
-                $forward_limit = $forward_ref_limit - $shift;
-            }
+            $i             = $end;
+            $forward_limit = $forward_ref_limit - $shift if $shift > 0;
             while ( $i < $forward_limit ) {
-                if ( $self->{newhash}[$i] == $self->{oldhash}[ $i + $shift ] || $self->_cost_effective( $i + $shift, $i, $shift > 0 ) ) {
-                    $self->{oldnum}[$i] = $i + $shift;
+                if ( $newhash->[$i] == $oldhash->[ $i + $shift ] || $self->_cost_effective( $i + $shift, $i, $shift > 0 ) ) {
+                    $oldnum->[$i] = $i + $shift;
                 }
-                else {
-                    last;
-                }
+                else {last}
                 $i++;
             }
             $back_limit     = $i;
@@ -777,36 +624,24 @@ package Cancer::CellBuf::Screen v0.0.1 {
         }
     }
 
-    sub _cost_effective ( $self, $from, $to, $blank ) {
+    method _cost_effective ( $from, $to, $blank ) {
         return 0 if $from == $to;
-        my $new_from = $self->{oldnum}[$from];
+        my $new_from = $oldnum->[$from];
         $new_from = $from if $new_from == newIndex;
-
-        # Cost before move
         my $cost_before;
-        if ($blank) {
-            $cost_before = $self->_update_cost_blank( $self->{newbuf}->line($to) );
-        }
-        else {
-            $cost_before = $self->_update_cost( $self->{curbuf}->line($to), $self->{newbuf}->line($to) );
-        }
-        $cost_before += $self->_update_cost( $self->{curbuf}->line($new_from), $self->{newbuf}->line($from) );
-
-        # Cost after move
+        if   ($blank) { $cost_before = $self->_update_cost_blank( $newbuf->line($to) ) }
+        else          { $cost_before = $self->_update_cost( $curbuf->line($to), $newbuf->line($to) ) }
+        $cost_before += $self->_update_cost( $curbuf->line($new_from), $newbuf->line($from) );
         my $cost_after;
-        if ( $new_from == $from ) {
-            $cost_after = $self->_update_cost_blank( $self->{newbuf}->line($from) );
-        }
-        else {
-            $cost_after = $self->_update_cost( $self->{curbuf}->line($new_from), $self->{newbuf}->line($from) );
-        }
-        $cost_after += $self->_update_cost( $self->{newbuf}->line($from), $self->{newbuf}->line($to) );
+        if   ( $new_from == $from ) { $cost_after = $self->_update_cost_blank( $newbuf->line($from) ) }
+        else                        { $cost_after = $self->_update_cost( $curbuf->line($new_from), $newbuf->line($from) ) }
+        $cost_after += $self->_update_cost( $newbuf->line($from), $newbuf->line($to) );
         return $cost_before >= $cost_after;
     }
 
-    sub _update_cost ( $self, $from_line, $to_line ) {
+    method _update_cost ( $from_line, $to_line ) {
         my $cost = 0;
-        for my $i ( 0 .. $self->{newbuf}->width - 1 ) {
+        for my $i ( 0 .. $newbuf->width - 1 ) {
             my $fc = $from_line ? $from_line->at($i) : undef;
             my $tc = $to_line   ? $to_line->at($i)   : undef;
             $cost++ unless _cell_equal( $fc, $tc );
@@ -814,235 +649,164 @@ package Cancer::CellBuf::Screen v0.0.1 {
         return $cost;
     }
 
-    sub _update_cost_blank ( $self, $to_line ) {
+    method _update_cost_blank ($to_line) {
         my $cost = 0;
-        for my $i ( 0 .. $self->{newbuf}->width - 1 ) {
+        for my $i ( 0 .. $newbuf->width - 1 ) {
             my $tc = $to_line ? $to_line->at($i) : undef;
             $cost++ unless _cell_equal( undef, $tc );
         }
         return $cost;
     }
 
-    sub _scroll_oldhash ( $self, $n, $top, $bot ) {
-        return unless @{ $self->{oldhash} };
+    method _scroll_oldhash ( $n, $top, $bot ) {
+        return unless @$oldhash;
         my $size = $bot - $top + 1 - abs($n);
         if ( $n > 0 ) {
-            for my $i ( 0 .. $size - 1 ) {
-                $self->{oldhash}[ $top + $i ] = $self->{oldhash}[ $top + $n + $i ];
-            }
-            for my $i ( reverse( $bot - $n + 1 .. $bot ) ) {
-                $self->{oldhash}[$i] = $self->_hash( $self->{curbuf}->line($i) );
-            }
+            for my $i ( 0 .. $size - 1 ) { $oldhash->[ $top + $i ] = $oldhash->[ $top + $n + $i ] }
+            for my $i ( reverse( $bot - $n + 1 .. $bot ) ) { $oldhash->[$i] = $self->_hash( $curbuf->line($i) ) }
         }
         elsif ( $n < 0 ) {
             my $an = abs($n);
-            for my $i ( reverse( 0 .. $size - 1 ) ) {
-                $self->{oldhash}[ $top + $an + $i ] = $self->{oldhash}[ $top + $i ];
-            }
-            for my $i ( $top .. $top + $an - 1 ) {
-                $self->{oldhash}[$i] = $self->_hash( $self->{curbuf}->line($i) );
-            }
+            for my $i ( reverse( 0 .. $size - 1 ) ) { $oldhash->[ $top + $an + $i ] = $oldhash->[ $top + $i ] }
+            for my $i ( $top .. $top + $an - 1 ) { $oldhash->[$i] = $self->_hash( $curbuf->line($i) ) }
         }
     }
 
-    sub _scroll_optimize ($self) {
-        my $height = $self->{newbuf}->height;
-        $self->{oldnum} = [] unless $self->{oldnum} && @{ $self->{oldnum} } >= $height;
+    method _scroll_optimize () {
+        my $height = $newbuf->height;
+        $oldnum = [] unless $oldnum && @$oldnum >= $height;
         $self->_update_hashmap;
-        return if @{ $self->{hashtab} } < $height;
-
-        # Pass 1 - from top to bottom scrolling up
+        return if @$hashtab < $height;
         my $i = 0;
         while ( $i < $height ) {
-            while ( $i < $height && ( $self->{oldnum}[$i] == newIndex || $self->{oldnum}[$i] <= $i ) ) {
-                $i++;
-            }
+            while ( $i < $height && ( $oldnum->[$i] == newIndex || $oldnum->[$i] <= $i ) ) { $i++ }
             last if $i >= $height;
-            my $shift = $self->{oldnum}[$i] - $i;    # shift > 0
+            my $shift = $oldnum->[$i] - $i;
             my $start = $i;
             $i++;
-            while ( $i < $height && $self->{oldnum}[$i] != newIndex && $self->{oldnum}[$i] - $i == $shift ) {
-                $i++;
-            }
-            my $end = $i - 1 + $shift;
-            $self->_scrolln( $shift, $start, $end, $height - 1 );
+            while ( $i < $height && $oldnum->[$i] != newIndex && $oldnum->[$i] - $i == $shift ) { $i++ }
+            $self->_scrolln( $shift, $start, $i - 1 + $shift, $height - 1 );
         }
-
-        # Pass 2 - from bottom to top scrolling down
         $i = $height - 1;
         while ( $i >= 0 ) {
-            while ( $i >= 0 && ( $self->{oldnum}[$i] == newIndex || $self->{oldnum}[$i] >= $i ) ) {
-                $i--;
-            }
+            while ( $i >= 0 && ( $oldnum->[$i] == newIndex || $oldnum->[$i] >= $i ) ) { $i-- }
             last if $i < 0;
-            my $shift = $self->{oldnum}[$i] - $i;    # shift < 0
+            my $shift = $oldnum->[$i] - $i;
             my $end   = $i;
             $i--;
-            while ( $i >= 0 && $self->{oldnum}[$i] != newIndex && $self->{oldnum}[$i] - $i == $shift ) {
-                $i--;
-            }
-            my $start = $i + 1 - abs($shift);
-            $self->_scrolln( $shift, $start, $end, $height - 1 );
+            while ( $i >= 0 && $oldnum->[$i] != newIndex && $oldnum->[$i] - $i == $shift ) { $i-- }
+            $self->_scrolln( $shift, $i + 1 - abs($shift), $end, $height - 1 );
         }
     }
 
-    sub _scrolln ( $self, $n, $top, $bot, $max_y ) {
+    method _scrolln ( $n, $top, $bot, $max_y ) {
         my $blank = $self->_clear_blank;
         if ( $n > 0 ) {
             my $v = $self->_scroll_up( $n, $top, $bot, 0, $max_y, $blank );
             if ( !$v ) {
-                $self->{buf} .= SetTopBottomMargins( $top + 1, $bot + 1 );
-                ( $self->{cur_x}, $self->{cur_y} ) = ( -1, -1 );
+                $buf .= SetTopBottomMargins( $top + 1, $bot + 1 );
+                ( $cur_x, $cur_y ) = ( -1, -1 );
                 $v = $self->_scroll_up( $n, $top, $bot, $top, $bot, $blank );
-                $self->{buf} .= SetTopBottomMargins( 1, $max_y + 1 );
-                ( $self->{cur_x}, $self->{cur_y} ) = ( -1, -1 );
+                $buf .= SetTopBottomMargins( 1, $max_y + 1 );
+                ( $cur_x, $cur_y ) = ( -1, -1 );
             }
-            if ( !$v ) {
-                $v = $self->_scroll_idl( $n, $top, $bot - $n + 1, $blank );
-            }
-            if ($v) {
-                $self->_scroll_buffer( $self->{curbuf}, $n, $top, $bot, $blank );
-                $self->_scroll_oldhash( $n, $top, $bot );
-            }
+            $v = $self->_scroll_idl( $n, $top, $bot - $n + 1, $blank ) unless $v;
+            if ($v) { $self->_scroll_buffer( $curbuf, $n, $top, $bot, $blank ); $self->_scroll_oldhash( $n, $top, $bot ) }
         }
         elsif ( $n < 0 ) {
             my $an = abs($n);
             my $v  = $self->_scroll_down( $an, $top, $bot, 0, $max_y, $blank );
             if ( !$v ) {
-                $self->{buf} .= SetTopBottomMargins( $top + 1, $bot + 1 );
-                ( $self->{cur_x}, $self->{cur_y} ) = ( -1, -1 );
+                $buf .= SetTopBottomMargins( $top + 1, $bot + 1 );
+                ( $cur_x, $cur_y ) = ( -1, -1 );
                 $v = $self->_scroll_down( $an, $top, $bot, $top, $bot, $blank );
-                $self->{buf} .= SetTopBottomMargins( 1, $max_y + 1 );
-                ( $self->{cur_x}, $self->{cur_y} ) = ( -1, -1 );
+                $buf .= SetTopBottomMargins( 1, $max_y + 1 );
+                ( $cur_x, $cur_y ) = ( -1, -1 );
             }
-            if ( !$v ) {
-                $v = $self->_scroll_idl( $an, $bot + $n + 1, $top, $blank );
-            }
-            if ($v) {
-                $self->_scroll_buffer( $self->{curbuf}, $n, $top, $bot, $blank );
-                $self->_scroll_oldhash( $n, $top, $bot );
-            }
+            $v = $self->_scroll_idl( $an, $bot + $n + 1, $top, $blank ) unless $v;
+            if ($v) { $self->_scroll_buffer( $curbuf, $n, $top, $bot, $blank ); $self->_scroll_oldhash( $n, $top, $bot ) }
         }
         return 1;
     }
 
-    sub _scroll_up ( $self, $n, $top, $bot, $min_y, $max_y, $blank ) {
+    method _scroll_up ( $n, $top, $bot, $min_y, $max_y, $blank ) {
         if ( $n == 1 && $top == $min_y && $bot == $max_y ) {
             $self->_move( 0, $bot );
             $self->_update_pen($blank);
-            $self->{buf} .= "\n";
+            $buf .= "\n";
         }
         elsif ( $n == 1 && $bot == $max_y ) {
             $self->_move( 0, $top );
             $self->_update_pen($blank);
-            $self->{buf} .= DeleteLine(1);
+            $buf .= DeleteLine(1);
         }
         elsif ( $top == $min_y && $bot == $max_y ) {
-            my $supports_su = $self->{caps} & CAP_SU;
-            if ($supports_su) {
-                $self->_move( 0, $bot );
-            }
-            else {
-                $self->_move( 0, $top );
-            }
+            $self->_move( 0, ( $caps & CAP_SU ) ? $bot : $top );
             $self->_update_pen($blank);
-            if ($supports_su) {
-                $self->{buf} .= ScrollUp($n);
-            }
-            else {
-                $self->{buf} .= "\n" x $n;
-            }
+            $buf .= ( $caps & CAP_SU ) ? ScrollUp($n) : ( "\n" x $n );
         }
         elsif ( $bot == $max_y ) {
             $self->_move( 0, $top );
             $self->_update_pen($blank);
-            $self->{buf} .= DeleteLine($n);
+            $buf .= DeleteLine($n);
         }
-        else {
-            return 0;
-        }
+        else { return 0 }
         return 1;
     }
 
-    sub _scroll_down ( $self, $n, $top, $bot, $min_y, $max_y, $blank ) {
+    method _scroll_down ( $n, $top, $bot, $min_y, $max_y, $blank ) {
+        $self->_move( 0, $top );
+        $self->_update_pen($blank);
         if ( $n == 1 && $top == $min_y && $bot == $max_y ) {
-            $self->_move( 0, $top );
-            $self->_update_pen($blank);
-            $self->{buf} .= ReverseIndex();
+            $buf .= ReverseIndex();
         }
         elsif ( $n == 1 && $bot == $max_y ) {
-            $self->_move( 0, $top );
-            $self->_update_pen($blank);
-            $self->{buf} .= InsertLine(1);
+            $buf .= InsertLine(1);
         }
         elsif ( $top == $min_y && $bot == $max_y ) {
-            $self->_move( 0, $top );
-            $self->_update_pen($blank);
-            if ( $self->{caps} & CAP_SD ) {
-                $self->{buf} .= ScrollDown($n);
-            }
-            else {
-                $self->{buf} .= ReverseIndex() x $n;
-            }
+            $buf .= ( $caps & CAP_SD ) ? ScrollDown($n) : ( ReverseIndex() x $n );
         }
         elsif ( $bot == $max_y ) {
-            $self->_move( 0, $top );
-            $self->_update_pen($blank);
-            $self->{buf} .= InsertLine($n);
+            $buf .= InsertLine($n);
         }
-        else {
-            return 0;
-        }
+        else { return 0 }
         return 1;
     }
 
-    sub _scroll_idl ( $self, $n, $del, $ins, $blank ) {
+    method _scroll_idl ( $n, $del, $ins, $blank ) {
         return 0 if $n < 0;
         $self->_move( 0, $del );
         $self->_update_pen($blank);
-        $self->{buf} .= DeleteLine($n);
+        $buf .= DeleteLine($n);
         $self->_move( 0, $ins );
         $self->_update_pen($blank);
-        $self->{buf} .= InsertLine($n);
+        $buf .= InsertLine($n);
         return 1;
     }
 
-    sub _scroll_buffer ( $self, $buf, $n, $top, $bot, $blank ) {
-        return if $top < 0 || $bot < $top || $bot >= $buf->height;
+    method _scroll_buffer ( $buf_obj, $n, $top, $bot, $blank ) {
+        return if $top < 0 || $bot < $top || $bot >= $buf_obj->height;
         if ( $n < 0 ) {
             my $limit = $top - abs($n);
-            for my $line ( reverse $limit .. $bot ) {
-                $buf->{lines}[$line] = $buf->{lines}[ $line + $n ];
-            }
-            for my $line ( $top .. $limit - 1 ) {
-                $buf->fill_rect( $blank, Rect( 0, $line, $buf->width, 1 ) );
-            }
+            for my $line ( reverse $limit .. $bot ) { $buf_obj->{lines}[$line] = $buf_obj->{lines}[ $line + $n ] }
+            for my $line ( $top .. $limit - 1 )     { $buf_obj->fill_rect( $blank, Rect( 0, $line, $buf_obj->width, 1 ) ) }
         }
         elsif ( $n > 0 ) {
             my $limit = $bot - $n;
-            for my $line ( $top .. $limit ) {
-                $buf->{lines}[$line] = $buf->{lines}[ $line + $n ];
-            }
-            for my $line ( reverse( $limit + 1 .. $bot ) ) {
-                $buf->fill_rect( $blank, Rect( 0, $line, $buf->width, 1 ) );
-            }
+            for my $line ( $top .. $limit )                { $buf_obj->{lines}[$line] = $buf_obj->{lines}[ $line + $n ] }
+            for my $line ( reverse( $limit + 1 .. $bot ) ) { $buf_obj->fill_rect( $blank, Rect( 0, $line, $buf_obj->width, 1 ) ) }
         }
-        $self->_touch_line( $buf->width, $buf->height, $top, $bot - $top + 1, 1 );
+        $self->_touch_line( $buf_obj->width, $buf_obj->height, $top, $bot - $top + 1, 1 );
     }
 
-    sub _touch_line ( $self, $width, $height, $y, $n, $changed ) {
-        return if $n < 0 || $y < 0 || $y >= $height;
-        for my $i ( $y .. _min( $y + $n - 1, $height - 1 ) ) {
-            if ($changed) {
-                $self->{touch}{$i} = { first_cell => 0, last_cell => $width - 1 };
-            }
-            else {
-                delete $self->{touch}{$i};
-            }
+    method _touch_line ( $tw, $th, $y, $n, $changed ) {
+        return if $n < 0 || $y < 0 || $y >= $th;
+        for my $i ( $y .. _min( $y + $n - 1, $th - 1 ) ) {
+            if ($changed) { $touch->{$i} = { first_cell => 0, last_cell => $tw - 1 } }
+            else          { delete $touch->{$i} }
         }
     }
 
-    # --- Helper functions ---
     sub _cell_equal ( $a, $b ) {
         return 1 if defined $a  && defined $b && $a == $b;
         return 1 if !defined $a && !defined $b;
@@ -1061,8 +825,6 @@ package Cancer::CellBuf::Screen v0.0.1 {
         return 0 if !defined $a || !defined $b;
         $a->equal($b);
     }
-    sub _max ( $a, $b ) { $a > $b ? $a : $b }
-    sub _min ( $a, $b ) { $a < $b ? $a : $b }
 
     sub _xterm_caps ($term) {
         my @parts = split /-/, $term;
@@ -1101,8 +863,6 @@ package Cancer::CellBuf::Screen v0.0.1 {
                 }
             }
         }
-        return [ 80, 24 ];    # Default fallback
+        return [ 80, 24 ];
     }
-}
-#
-1;
+} 1;

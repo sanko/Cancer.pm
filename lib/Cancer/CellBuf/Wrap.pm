@@ -6,6 +6,7 @@ package Cancer::CellBuf::Wrap v0.0.1 {
     use Cancer::Ansi::Parser qw[
         new_parser parser_reset DecodeSequence HasCsiPrefix HasOscPrefix
         param command params data MissingParam ParamVal HasMore
+        _read_style_color
     ];
     use Cancer::Ansi qw[ResetStyle set_hyperlink reset_hyperlink];
     use Cancer::CellBuf::Style;
@@ -116,58 +117,11 @@ package Cancer::CellBuf::Wrap v0.0.1 {
         return $style;
     }
 
-    sub _read_style_color ($params) {
-        return ( undef, 0 ) if @$params < 2;
-        my $s          = $params->[0];
-        my $p          = $params->[1];
-        my $color_type = ParamVal( $p, 0 );
-        my $s_has_more = HasMore($s);
-        my $p_has_more = HasMore($p);
-        my $n          = 2;
-        if ( $color_type == 5 ) {
-            return ( undef, 0 ) if @$params < 3;
-            my $idx = ParamVal( $params->[2], 0 );
-            if ( $p_has_more && !$s_has_more ) {
-
-                # colon: 38:5:idx
-            }
-            elsif ( !$p_has_more && !$s_has_more ) {
-
-                # semicolon: 38;5;idx
-            }
-            else {
-                return ( undef, 0 );
-            }
-            return ( { type => '256', index => $idx }, 3 );
-        }
-        elsif ( $color_type == 2 ) {
-            return ( undef, 0 ) if @$params < 5;
-            my ( $r, $g, $b );
-            if ( $s_has_more && $p_has_more ) {
-                $r = ParamVal( $params->[2], 0 );
-                $g = ParamVal( $params->[3], 0 );
-                $b = ParamVal( $params->[4], 0 );
-                $n = 5;
-            }
-            elsif ( !$s_has_more && !$p_has_more ) {
-                $r = ParamVal( $params->[2], 0 );
-                $g = ParamVal( $params->[3], 0 );
-                $b = ParamVal( $params->[4], 0 );
-                $n = 5;
-            }
-            else {
-                return ( undef, 0 );
-            }
-            return ( { type => 'rgb', r => $r, g => $g, b => $b }, $n );
-        }
-        return ( undef, 0 );
-    }
-
     sub _read_link ( $data, $link ) {
         my @parts = split /;/, $data, 3;
         return $link unless @parts == 3;
-        $link->{params} = $parts[1];
-        $link->{url}    = $parts[2];
+        $link->set_params( $parts[1] );
+        $link->set_url( $parts[2] );
         return $link;
     }
 
@@ -307,4 +261,5 @@ package Cancer::CellBuf::Wrap v0.0.1 {
         return $buf;
     }
 }
+#
 1;

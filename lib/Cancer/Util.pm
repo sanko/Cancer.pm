@@ -186,7 +186,20 @@ package Cancer::Util v0.0.1 {
     );
     our @EXPORT_OK
         = qw[byte_to_grapheme_range truncate truncate_left cut visual_width grapheme_width width height size visual_truncate ansi_cut strip_ansi
-        string_width string_width_wc go_duration hardwrap wordwrap wrap ];
+        string_width string_width_wc go_duration hardwrap wordwrap wrap
+        _max _min _to6cube _dist_sq];
+    sub _max ( $a, $b ) { $a > $b ? $a : $b }
+    sub _min ( $a, $b ) { $a < $b ? $a : $b }
+
+    sub _to6cube ($v) {
+        return 0 if $v < 48;
+        return 1 if $v < 115;
+        return int( ( $v - 35 ) / 40 );
+    }
+
+    sub _dist_sq ( $r1, $g1, $b1, $r2, $g2, $b2 ) {
+        ( $r1 - $r2 )**2 + ( $g1 - $g2 )**2 + ( $b1 - $b2 )**2;
+    }
 
     sub _in_ranges ( $cp, $ranges ) {
         my $lo = 0;

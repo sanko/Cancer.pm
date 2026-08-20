@@ -196,4 +196,5 @@ package Cancer::CellBuf::Writer v0.0.1 {
         else                                                                           { return 1 }
     }
 }
+#
 1;

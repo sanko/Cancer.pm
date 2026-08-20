@@ -65,7 +65,8 @@
          "version" : "v0.0.1"
       },
       "Cancer::Ansi::Parser" : {
-         "file" : "lib/Cancer/Ansi/Parser.pm"
+         "file" : "lib/Cancer/Ansi/Parser.pm",
+         "version" : "v0.0.1"
       },
       "Cancer::Ansi::Sixel" : {
          "file" : "lib/Cancer/Ansi/Sixel.pm",
@@ -137,6 +138,14 @@
       },
       "Cancer::CellBuf::Writer" : {
          "file" : "lib/Cancer/CellBuf/Writer.pm",
+         "version" : "v0.0.1"
+      },
+      "Cancer::ColorProfile" : {
+         "file" : "lib/Cancer/ColorProfile.pm",
+         "version" : "v0.0.1"
+      },
+      "Cancer::ColorProfile::Writer" : {
+         "file" : "lib/Cancer/ColorProfile/Writer.pm",
          "version" : "v0.0.1"
       },
       "Cancer::Lipgloss" : {

@@ -189,16 +189,19 @@ subtest '_hash produces consistent values' => sub {
 subtest '_touch_line marks lines as touched' => sub {
     my ( $s, $w ) = make_screen( width => 5, height => 3 );
     $s->_touch_line( 5, 3, 1, 2, 1 );
-    is exists $s->{touch}{1}, T(), 'touch_line marks line 1';
-    is exists $s->{touch}{2}, T(), 'touch_line marks line 2';
-    is exists $s->{touch}{0}, F(), 'touch_line does not mark line 0';
+    my $touch = $s->touch;
+    is exists $touch->{1}, T(), 'touch_line marks line 1';
+    is exists $touch->{2}, T(), 'touch_line marks line 2';
+    is exists $touch->{0}, F(), 'touch_line does not mark line 0';
 };
 subtest '_touch_line clears touch' => sub {
     my ( $s, $w ) = make_screen( width => 5, height => 3 );
     $s->_touch_line( 5, 3, 1, 2, 1 );
-    is $s->{touch}{1}, E(), 'touch_line sets touch';
+    my $touch = $s->touch;
+    is $touch->{1}, E(), 'touch_line sets touch';
     $s->_touch_line( 5, 3, 1, 2, 0 );
-    is $s->{touch}{1}, E(), 'touch_line clears touch';
+    $touch = $s->touch;
+    is $touch->{1}, E(), 'touch_line clears touch';
 };
 subtest '_cell_equal helper' => sub {
     is Cancer::CellBuf::Screen::_cell_equal( undef,   undef ),   T(), 'both undef is equal';

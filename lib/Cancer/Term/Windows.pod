@@ -26,7 +26,7 @@ directly.
 
 The module tries two FFI backends at compile time in order:
 
-=over 4
+=over
 
 =item 1. L<Affix> (preferred)
 

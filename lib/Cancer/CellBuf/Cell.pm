@@ -1,7 +1,12 @@
 use v5.42;
-
-package Cancer::CellBuf::Cell v0.0.1 {
+use experimental 'class';
+class Cancer::CellBuf::Cell v0.0.1 {
     use Carp qw[carp];
+    field $rune  : param : reader = 0;
+    field $comb  : param : reader = [];
+    field $width : param : reader = 0;
+    field $style : param : reader //= undef;
+    field $link  : param : reader //= undef;
     my $BLANK;
     my $EMPTY;
 
@@ -14,87 +19,67 @@ package Cancer::CellBuf::Cell v0.0.1 {
         $EMPTY //= __PACKAGE__->new();
         return $EMPTY;
     }
+    method set_style ($s) { $style = $s; return $self }
+    method set_link  ($l) { $link  = $l; return $self }
 
-    sub new ( $class, %args ) {
-        bless {
-            rune  => $args{rune}  // 0,
-            comb  => $args{comb}  // [],
-            width => $args{width} // 0,
-            style => $args{style} // undef,
-            link  => $args{link}  // undef
-        }, $class;
-    }
-    sub rune      ($self)       { $self->{rune} }
-    sub comb      ($self)       { $self->{comb} }
-    sub width     ($self)       { $self->{width} }
-    sub style     ($self)       { $self->{style} }
-    sub link      ($self)       { $self->{link} }
-    sub set_style ( $self, $s ) { $self->{style} = $s; $self }
-    sub set_link  ( $self, $l ) { $self->{link}  = $l; $self }
-
-    sub string ($self) {
-        return '' unless $self->{rune};
-        my $s = chr( $self->{rune} );
-        $s .= chr($_) for @{ $self->{comb} };
+    method string () {
+        return '' unless $rune;
+        my $s = chr($rune);
+        $s .= chr($_) for @$comb;
         return $s;
     }
 
-    sub append ( $self, @runes ) {
+    method append (@runes) {
         for my $i ( 0 .. $#runes ) {
-            if ( $i == 0 && $self->{rune} == 0 ) {
-                $self->{rune} = $runes[$i];
+            if ( $i == 0 && $rune == 0 ) {
+                $rune = $runes[$i];
             }
             else {
-                push @{ $self->{comb} }, $runes[$i];
+                push @$comb, $runes[$i];
             }
         }
-        $self;
+        return $self;
     }
 
-    sub empty ($self) {
-        $self->{width} == 0 && $self->{rune} == 0 && !@{ $self->{comb} };
+    method empty () {
+        $width == 0 && $rune == 0 && !@$comb;
     }
 
-    sub clear ($self) {
-        $self->{rune} == ord(' ')                        &&
-            !@{ $self->{comb} }                          &&
-            $self->{width} == 1                          &&
-            ( !$self->{style} || $self->{style}->clear ) &&
-            ( !$self->{link} || $self->{link}->empty );
+    method clear () {
+        $rune == ord(' ') && !@$comb && $width == 1 && ( !$style || $style->clear ) && ( !$link || $link->empty );
     }
 
-    sub reset ($self) {
-        $self->{rune}  = 0;
-        $self->{comb}  = [];
-        $self->{width} = 0;
-        $self->{style}->reset if $self->{style};
-        $self->{link}->reset  if $self->{link};
-        $self;
+    method reset () {
+        $rune  = 0;
+        $comb  = [];
+        $width = 0;
+        $style->reset if $style;
+        $link->reset  if $link;
+        return $self;
     }
 
-    sub clone ($self) {
-        my $clone = {%$self};
-        $clone->{comb}  = [ @{ $self->{comb} } ] if @{ $self->{comb} };
-        $clone->{style} = $self->{style}->clone  if $self->{style};
-        $clone->{link}  = $self->{link}->clone   if $self->{link};
-        bless $clone, ref $self;
+    method clone () {
+        my @c_comb  = @$comb;
+        my $c_style = $style->clone if $style;
+        my $c_link  = $link->clone  if $link;
+        return __PACKAGE__->new( rune => $rune, comb => \@c_comb, width => $width, style => $c_style, link => $c_link );
     }
 
-    sub blank ($self) {
-        $self->{rune}  = ord(' ');
-        $self->{comb}  = [];
-        $self->{width} = 1;
-        $self;
+    method blank () {
+        $rune  = ord(' ');
+        $comb  = [];
+        $width = 1;
+        return $self;
     }
 
-    sub equal ( $self, $other ) {
+    method equal ($other) {
         return 1 if $self == $other;
         return 0 unless defined $other;
-        $self->{width} == $other->{width}                   &&
-            $self->{rune} == $other->{rune}                 &&
-            _runes_equal( $self->{comb}, $other->{comb} )   &&
-            _style_equal( $self->{style}, $other->{style} ) &&
-            _link_equal( $self->{link}, $other->{link} );
+        $width == $other->width                   &&
+            $rune == $other->rune                 &&
+            _runes_equal( $comb, $other->comb )   &&
+            _style_equal( $style, $other->style ) &&
+            _link_equal( $link, $other->link );
     }
 
     sub _runes_equal ( $a, $b ) {
@@ -118,5 +103,4 @@ package Cancer::CellBuf::Cell v0.0.1 {
         return 0 if !defined $a || !defined $b;
         $a->equal($b);
     }
-}
-1;
+} 1;

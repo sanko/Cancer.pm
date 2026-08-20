@@ -56,8 +56,7 @@ sub options_string {
     my ($o) = @_;
     return join( ',', build_options($o) );
 }
-
-# -- Tests ---------------------------------------------------------------
+#
 subtest 'TestOptions_Options' => sub {
     my @tests = (
         [ 'default options',            {},                                               [] ],
@@ -135,8 +134,8 @@ subtest 'TestOptions_String' => sub {
                 parent_id           => 999,
                 parent_placement_id => 888
             },
-            'f=1,q=81,i=123,p=456,I=789,s=800,v=600,t=T,S=1024,O=10,U=1,P=999,Q=888,x=100,y=200,z=300,w=400,h=500,X=50,Y=60,c=4,r=3,d=D,a=A',
-        ],
+            'f=1,q=81,i=123,p=456,I=789,s=800,v=600,t=T,S=1024,O=10,U=1,P=999,Q=888,x=100,y=200,z=300,w=400,h=500,X=50,Y=60,c=4,r=3,d=D,a=A'
+        ]
     );
     for my $tc (@tests) {
         my ( $name, $options, $want ) = @$tc;
@@ -152,7 +151,7 @@ subtest 'TestOptions_MarshalText' => sub {
         [   'marshal with values',
             { action => 'A', id => 123, width => 400, height => 500, quiet => 2, do_not_move_cursor => 1 },
             'q=2,i=123,C=1,w=400,h=500,a=A'
-        ],
+        ]
     );
     for my $tc (@tests) {
         my ( $name, $options, $want ) = @$tc;

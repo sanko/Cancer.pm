@@ -1,7 +1,6 @@
 use v5.42;
-
-package Cancer::CellBuf::Style v0.0.1 {
-    use Exporter     qw[import];
+use experimental 'class';
+class Cancer::CellBuf::Style v0.0.1 {
     use Cancer::Ansi qw[
         ResetStyle SGR UnderlineNone UnderlineSingle UnderlineDouble
         UnderlineCurly UnderlineDotted UnderlineDashed AttrBold AttrFaint
@@ -29,64 +28,54 @@ package Cancer::CellBuf::Style v0.0.1 {
         DOTTED_UNDERLINE => UnderlineDotted(),
         DASHED_UNDERLINE => UnderlineDashed()
     };
+    field $fg       : param : reader //= undef;
+    field $bg       : param : reader //= undef;
+    field $ul       : param : reader //= undef;
+    field $attrs    : param : reader = RESET_ATTR;
+    field $ul_style : param : reader = NO_UNDERLINE;
+    method set_fg              ($c) { $fg = $c; return $self }
+    method set_bg              ($c) { $bg = $c; return $self }
+    method set_ul              ($c) { $ul = $c; return $self }
+    method set_bold            ($v) { $v ? ( $attrs |= BOLD_ATTR )          : ( $attrs &= ~BOLD_ATTR );          return $self }
+    method set_faint           ($v) { $v ? ( $attrs |= FAINT_ATTR )         : ( $attrs &= ~FAINT_ATTR );         return $self }
+    method set_italic          ($v) { $v ? ( $attrs |= ITALIC_ATTR )        : ( $attrs &= ~ITALIC_ATTR );        return $self }
+    method set_slow_blink      ($v) { $v ? ( $attrs |= SLOW_BLINK_ATTR )    : ( $attrs &= ~SLOW_BLINK_ATTR );    return $self }
+    method set_rapid_blink     ($v) { $v ? ( $attrs |= RAPID_BLINK_ATTR )   : ( $attrs &= ~RAPID_BLINK_ATTR );   return $self }
+    method set_reverse         ($v) { $v ? ( $attrs |= REVERSE_ATTR )       : ( $attrs &= ~REVERSE_ATTR );       return $self }
+    method set_conceal         ($v) { $v ? ( $attrs |= CONCEAL_ATTR )       : ( $attrs &= ~CONCEAL_ATTR );       return $self }
+    method set_strikethrough   ($v) { $v ? ( $attrs |= STRIKETHROUGH_ATTR ) : ( $attrs &= ~STRIKETHROUGH_ATTR ); return $self }
+    method set_underline_style ($s) { $ul_style = $s; return $self }
 
-    sub new ( $class, %args ) {
-        bless {
-            fg       => $args{fg}       // undef,
-            bg       => $args{bg}       // undef,
-            ul       => $args{ul}       // undef,
-            attrs    => $args{attrs}    // RESET_ATTR,
-            ul_style => $args{ul_style} // NO_UNDERLINE
-        }, $class;
-    }
-    sub fg                ($self)       { $self->{fg} }
-    sub bg                ($self)       { $self->{bg} }
-    sub ul                ($self)       { $self->{ul} }
-    sub attrs             ($self)       { $self->{attrs} }
-    sub ul_style          ($self)       { $self->{ul_style} }
-    sub set_fg            ( $self, $c ) { $self->{fg} = $c; $self }
-    sub set_bg            ( $self, $c ) { $self->{bg} = $c; $self }
-    sub set_ul            ( $self, $c ) { $self->{ul} = $c; $self }
-    sub set_bold          ( $self, $v ) { $v ? ( $self->{attrs} |= BOLD_ATTR )          : ( $self->{attrs} &= ~BOLD_ATTR );          $self }
-    sub set_faint         ( $self, $v ) { $v ? ( $self->{attrs} |= FAINT_ATTR )         : ( $self->{attrs} &= ~FAINT_ATTR );         $self }
-    sub set_italic        ( $self, $v ) { $v ? ( $self->{attrs} |= ITALIC_ATTR )        : ( $self->{attrs} &= ~ITALIC_ATTR );        $self }
-    sub set_slow_blink    ( $self, $v ) { $v ? ( $self->{attrs} |= SLOW_BLINK_ATTR )    : ( $self->{attrs} &= ~SLOW_BLINK_ATTR );    $self }
-    sub set_rapid_blink   ( $self, $v ) { $v ? ( $self->{attrs} |= RAPID_BLINK_ATTR )   : ( $self->{attrs} &= ~RAPID_BLINK_ATTR );   $self }
-    sub set_reverse       ( $self, $v ) { $v ? ( $self->{attrs} |= REVERSE_ATTR )       : ( $self->{attrs} &= ~REVERSE_ATTR );       $self }
-    sub set_conceal       ( $self, $v ) { $v ? ( $self->{attrs} |= CONCEAL_ATTR )       : ( $self->{attrs} &= ~CONCEAL_ATTR );       $self }
-    sub set_strikethrough ( $self, $v ) { $v ? ( $self->{attrs} |= STRIKETHROUGH_ATTR ) : ( $self->{attrs} &= ~STRIKETHROUGH_ATTR ); $self }
-    sub set_underline_style( $self, $s ) { $self->{ul_style} = $s; $self }
-
-    sub set_underline ( $self, $v ) {
+    method set_underline ($v) {
         $v ? $self->set_underline_style(SINGLE_UNDERLINE) : $self->set_underline_style(NO_UNDERLINE);
     }
-    sub contains ( $self, $attr ) { ( $self->{attrs} & $attr ) == $attr }
+    method contains ($attr) { ( $attrs & $attr ) == $attr }
 
-    sub empty ($self) {
-        !defined $self->{fg} && !defined $self->{bg} && !defined $self->{ul} && $self->{attrs} == RESET_ATTR && $self->{ul_style} == NO_UNDERLINE;
+    method empty () {
+        !defined $fg && !defined $bg && !defined $ul && $attrs == RESET_ATTR && $ul_style == NO_UNDERLINE;
     }
 
-    sub clear ($self) {
-        $self->{ul_style} == NO_UNDERLINE                                                                            &&
-            ( $self->{attrs} & ~( BOLD_ATTR | FAINT_ATTR | ITALIC_ATTR | SLOW_BLINK_ATTR | RAPID_BLINK_ATTR ) ) == 0 &&
-            !defined $self->{fg}                                                                                     &&
-            !defined $self->{bg}                                                                                     &&
-            !defined $self->{ul};
+    method clear () {
+        $ul_style == NO_UNDERLINE                                                                            &&
+            ( $attrs & ~( BOLD_ATTR | FAINT_ATTR | ITALIC_ATTR | SLOW_BLINK_ATTR | RAPID_BLINK_ATTR ) ) == 0 &&
+            !defined $fg                                                                                     &&
+            !defined $bg                                                                                     &&
+            !defined $ul;
     }
 
-    sub reset ($self) {
-        $self->{fg}       = undef;
-        $self->{bg}       = undef;
-        $self->{ul}       = undef;
-        $self->{attrs}    = RESET_ATTR;
-        $self->{ul_style} = NO_UNDERLINE;
-        $self;
+    method reset () {
+        $fg       = undef;
+        $bg       = undef;
+        $ul       = undef;
+        $attrs    = RESET_ATTR;
+        $ul_style = NO_UNDERLINE;
+        return $self;
     }
 
-    sub sequence ($self) {
+    method sequence () {
         return ResetStyle() if $self->empty;
         my @codes;
-        my $a = $self->{attrs};
+        my $a = $attrs;
         push @codes, 1 if $a & BOLD_ATTR;
         push @codes, 2 if $a & FAINT_ATTR;
         push @codes, 3 if $a & ITALIC_ATTR;
@@ -96,40 +85,40 @@ package Cancer::CellBuf::Style v0.0.1 {
         push @codes, 8 if $a & CONCEAL_ATTR;
         push @codes, 9 if $a & STRIKETHROUGH_ATTR;
 
-        if ( $self->{ul_style} != NO_UNDERLINE ) {
-            push @codes, 4, $self->{ul_style};
+        if ( $ul_style != NO_UNDERLINE ) {
+            push @codes, 4, $ul_style;
         }
-        if ( defined $self->{fg} ) {
-            push @codes, _color_codes( 38, $self->{fg} );
+        if ( defined $fg ) {
+            push @codes, _color_codes( 38, $fg );
         }
-        if ( defined $self->{bg} ) {
-            push @codes, _color_codes( 48, $self->{bg} );
+        if ( defined $bg ) {
+            push @codes, _color_codes( 48, $bg );
         }
-        if ( defined $self->{ul} ) {
-            push @codes, _color_codes( 58, $self->{ul} );
+        if ( defined $ul ) {
+            push @codes, _color_codes( 58, $ul );
         }
         return ResetStyle() unless @codes;
         return SGR(@codes);
     }
 
-    sub diff_sequence ( $self, $old ) {
+    method diff_sequence ($old) {
         return $self->sequence if $old->empty;
         my @codes;
-        if ( !_color_eq( $self->{fg}, $old->{fg} ) ) {
-            push @codes, _color_codes( 38, $self->{fg} ) if defined $self->{fg};
-            push @codes, 39                              if !defined $self->{fg};
+        if ( !_color_eq( $fg, $old->fg ) ) {
+            push @codes, _color_codes( 38, $fg ) if defined $fg;
+            push @codes, 39                      if !defined $fg;
         }
-        if ( !_color_eq( $self->{bg}, $old->{bg} ) ) {
-            push @codes, _color_codes( 48, $self->{bg} ) if defined $self->{bg};
-            push @codes, 49                              if !defined $self->{bg};
+        if ( !_color_eq( $bg, $old->bg ) ) {
+            push @codes, _color_codes( 48, $bg ) if defined $bg;
+            push @codes, 49                      if !defined $bg;
         }
-        if ( !_color_eq( $self->{ul}, $old->{ul} ) ) {
-            push @codes, _color_codes( 58, $self->{ul} ) if defined $self->{ul};
-            push @codes, 59                              if !defined $self->{ul};
+        if ( !_color_eq( $ul, $old->ul ) ) {
+            push @codes, _color_codes( 58, $ul ) if defined $ul;
+            push @codes, 59                      if !defined $ul;
         }
         my ( $no_blink, $is_normal );
-        my $sa = $self->{attrs};
-        my $oa = $old->{attrs};
+        my $sa = $attrs;
+        my $oa = $old->attrs;
         if ( $sa != $oa ) {
             for my $check (
                 [   BOLD_ATTR,        sub { push @codes, 1 }, FAINT_ATTR,         sub { push @codes, 2 },
@@ -145,45 +134,38 @@ package Cancer::CellBuf::Style v0.0.1 {
                     }
                     elsif ( !$is_normal && ( $attr == BOLD_ATTR || $attr == FAINT_ATTR ) ) {
                         $is_normal = 1;
-                        push @codes, 22;    # Normal intensity
+                        push @codes, 22;
                     }
                     elsif ( !$no_blink && ( $attr == SLOW_BLINK_ATTR || $attr == RAPID_BLINK_ATTR ) ) {
                         $no_blink = 1;
-                        push @codes, 25;    # Blink off
+                        push @codes, 25;
                     }
                 }
             }
         }
-        if ( $self->{ul_style} != $old->{ul_style} ) {
-            push @codes, 4, $self->{ul_style};
+        if ( $ul_style != $old->ul_style ) {
+            push @codes, 4, $ul_style;
         }
         return ResetStyle() unless @codes;
         return SGR(@codes);
     }
 
-    sub equal ( $self, $other ) {
+    method equal ($other) {
         return 1 if $self == $other;
         return 0 unless defined $other;
-        $self->{attrs} == $other->{attrs}           &&
-            $self->{ul_style} == $other->{ul_style} &&
-            _color_eq( $self->{fg}, $other->{fg} )  &&
-            _color_eq( $self->{bg}, $other->{bg} )  &&
-            _color_eq( $self->{ul}, $other->{ul} );
+        $attrs == $other->attrs           &&
+            $ul_style == $other->ul_style &&
+            _color_eq( $fg, $other->fg )  &&
+            _color_eq( $bg, $other->bg )  &&
+            _color_eq( $ul, $other->ul );
     }
 
-    sub _color_eq ( $a, $b ) {
-        return 1 if !defined $a && !defined $b;
-        return 0 if !defined $a || !defined $b;
-        return 0 unless ref $a eq 'HASH' && ref $b eq 'HASH';
-        $a->{type} eq $b->{type} &&
-            ( $a->{type} ne 'rgb' || ( $a->{r} == $b->{r} && $a->{g} == $b->{g} && $a->{b} == $b->{b} ) ) &&
-            ( $a->{type} ne '256' || $a->{index} == $b->{index} ) &&
-            ( $a->{type} ne 'basic' || $a->{code} == $b->{code} );
+    method clone () {
+        my $c_fg = defined $fg ? {%$fg} : undef;
+        my $c_bg = defined $bg ? {%$bg} : undef;
+        my $c_ul = defined $ul ? {%$ul} : undef;
+        return __PACKAGE__->new( fg => $c_fg, bg => $c_bg, ul => $c_ul, attrs => $attrs, ul_style => $ul_style );
     }
-
-    # Maps (prefix_type, basic_color_code) to the correct SGR code.
-    # prefix_type: 38=fg, 48=bg, 58=underline
-    # basic_color_code: 0-7 (black..white), 8-15 (bright variants)
     my %BASIC_FG = (
         0  => 30,
         1  => 31,
@@ -220,7 +202,17 @@ package Cancer::CellBuf::Style v0.0.1 {
         14 => 106,
         15 => 107
     );
-    my %BASIC_UL = ( 0 => 58, 1 => 59 );    # underline color has no basic preset, fall through
+    my %BASIC_UL = ( 0 => 58, 1 => 59 );
+
+    sub _color_eq ( $a, $b ) {
+        return 1 if !defined $a && !defined $b;
+        return 0 if !defined $a || !defined $b;
+        return 0 unless ref $a eq 'HASH' && ref $b eq 'HASH';
+        $a->{type} eq $b->{type} &&
+            ( $a->{type} ne 'rgb' || ( $a->{r} == $b->{r} && $a->{g} == $b->{g} && $a->{b} == $b->{b} ) ) &&
+            ( $a->{type} ne '256' || $a->{index} == $b->{index} ) &&
+            ( $a->{type} ne 'basic' || $a->{code} == $b->{code} );
+    }
 
     sub _color_codes ( $prefix, $c ) {
         return () unless defined $c;
@@ -241,15 +233,4 @@ package Cancer::CellBuf::Style v0.0.1 {
         }
         return ();
     }
-
-    sub clone ($self) {
-        my $clone = {%$self};
-
-        # Deep copy colors
-        for my $k (qw[fg bg ul]) {
-            $clone->{$k} = { %{ $clone->{$k} } } if defined $clone->{$k};
-        }
-        bless $clone, ref $self;
-    }
-}
-1;
+} 1;

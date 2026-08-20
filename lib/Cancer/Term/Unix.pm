@@ -53,11 +53,8 @@ package Cancer::Term::Unix v0.0.1 {
         $IOCTL_WINSZ = 0x5413;        # TIOCGWINSZ
     }
 
-    # --- Helpers ---------------------------------------------------------------
-    # Perl's ioctl() truncates the SV's string length to the syscall return
-    # value.  On Linux, TCGETS returns 0 on success, zeroing the buffer.  We
-    # work around this on Linux by calling ioctl via syscall() which doesn't
-    # touch the SV.  On BSD/macOS, ioctl returns 1 so Perl doesn't truncate.
+    # Perl's ioctl() truncates the SV's string length to the syscall return value. On Linux, TCGETS returns 0 on success, zeroing the buffer. We
+    # work around this on Linux by calling ioctl via syscall() which doesn't touch the SV. On BSD/macOS, ioctl returns 1 so Perl doesn't truncate.
     my $USE_SYSCALL;
     my $SYS_IOCTL;
     if ( $^O eq 'linux' ) {
@@ -129,8 +126,7 @@ package Cancer::Term::Unix v0.0.1 {
         substr( $buf, $L->{cc}[0] + $idx, 1 ) = pack( 'C', $val );
         return $buf;
     }
-
-    # --- Public API -----------------------------------------------------------
+    #
     sub is_terminal ( $class, $fd ) {
         return defined _read_termios($fd) ? 1 : 0;
     }
@@ -202,7 +198,7 @@ package Cancer::Term::Unix v0.0.1 {
         return $pass;
     }
 
-    # --- readPasswordLine (ported from Go util.go) ----------------------------
+    # readPasswordLine (ported from Go util.go)
     sub _read_password_line ($reader) {
         my @ret;
         while ( sysread( $reader, my $byte, 1 ) ) {

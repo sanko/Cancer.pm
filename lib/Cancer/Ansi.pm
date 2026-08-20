@@ -3,6 +3,7 @@ use v5.42;
 package Cancer::Ansi v0.0.1 {
     use Exporter qw[import];
     use MIME::Base64;
+    use Cancer::Util qw[_to6cube _dist_sq];
     our %EXPORT_TAGS = (
         all => [
             our @EXPORT_OK
@@ -10,6 +11,52 @@ package Cancer::Ansi v0.0.1 {
                 ScreenPassthrough TmuxPassthrough
                 URxvtExt
                 ITerm2
+                FinalTerm FinalTermPrompt FinalTermCmdStart FinalTermCmdExecuted FinalTermCmdFinished
+                XTGETTCAP RequestTermcap RequestTerminfo
+                Focus Blur
+                KeypadApplicationMode DECKPAM KeypadNumericMode DECKPNM
+                PrimaryDeviceAttributes DA1 SecondaryDeviceAttributes DA2 TertiaryDeviceAttributes DA3
+                RequestPrimaryDeviceAttributes RequestSecondaryDeviceAttributes RequestTertiaryDeviceAttributes
+                RequestNameVersion XTVERSION
+                SetModeKeyboardAction ResetModeKeyboardAction RequestModeKeyboardAction
+                SetModeInsertReplace ResetModeInsertReplace RequestModeInsertReplace
+                SetModeBiDirectionalSupport ResetModeBiDirectionalSupport RequestModeBiDirectionalSupport
+                SetModeSendReceive ResetModeSendReceive RequestModeSendReceive
+                SetModeLocalEcho ResetModeLocalEcho RequestModeLocalEcho
+                SetModeLineFeedNewLine ResetModeLineFeedNewLine RequestModeLineFeedNewLine
+                SetModeCursorKeys ResetModeCursorKeys RequestModeCursorKeys
+                SetModeOrigin ResetModeOrigin RequestModeOrigin
+                SetModeAutoWrap ResetModeAutoWrap RequestModeAutoWrap
+                SetModeMouseX10 ResetModeMouseX10 RequestModeMouseX10
+                SetModeTextCursorEnable ResetModeTextCursorEnable RequestModeTextCursorEnable
+                SetModeNumericKeypad ResetModeNumericKeypad RequestModeNumericKeypad
+                SetModeBackarrowKey ResetModeBackarrowKey RequestModeBackarrowKey
+                SetModeLeftRightMargin ResetModeLeftRightMargin RequestModeLeftRightMargin
+                SetModeMouseNormal ResetModeMouseNormal RequestModeMouseNormal
+                SetModeMouseHighlight ResetModeMouseHighlight RequestModeMouseHighlight
+                SetModeMouseButtonEvent ResetModeMouseButtonEvent RequestModeMouseButtonEvent
+                SetModeMouseAnyEvent ResetModeMouseAnyEvent RequestModeMouseAnyEvent
+                SetModeFocusEvent ResetModeFocusEvent RequestModeFocusEvent
+                SetModeMouseExtSgr ResetModeMouseExtSgr RequestModeMouseExtSgr
+                SetModeMouseExtUtf8 ResetModeMouseExtUtf8 RequestModeMouseExtUtf8
+                SetModeMouseExtUrxvt ResetModeMouseExtUrxvt RequestModeMouseExtUrxvt
+                SetModeMouseExtSgrPixel ResetModeMouseExtSgrPixel RequestModeMouseExtSgrPixel
+                SetModeAltScreen ResetModeAltScreen RequestModeAltScreen
+                SetModeSaveCursor ResetModeSaveCursor RequestModeSaveCursor
+                SetModeAltScreenSaveCursor ResetModeAltScreenSaveCursor RequestModeAltScreenSaveCursor
+                SetModeBracketedPaste ResetModeBracketedPaste RequestModeBracketedPaste
+                SetModeSynchronizedOutput ResetModeSynchronizedOutput RequestModeSynchronizedOutput
+                SetModeUnicodeCore ResetModeUnicodeCore RequestModeUnicodeCore
+                SetModeLightDark ResetModeLightDark RequestModeLightDark
+                SetModeInBandResize ResetModeInBandResize RequestModeInBandResize
+                SetModeWin32Input ResetModeWin32Input RequestModeWin32Input
+                SM RM DECSET DECRST DECRQM DECRPM
+                InBandResize
+                DisableModifyOtherKeys EnableModifyOtherKeys1 EnableModifyOtherKeys2 RequestModifyOtherKeys
+                DECST8C
+                MouseX10
+                SixelGraphics Convert16
+                Strip StringWidth Hardwrap Wordwrap Wrap Truncate TruncateLeft Cut
                 set_foreground_color set_background_color set_cursor_color
                 request_foreground_color request_background_color request_cursor_color
                 reset_foreground_color reset_background_color reset_cursor_color
@@ -177,6 +224,667 @@ package Cancer::Ansi v0.0.1 {
         "\e_G${p}\e\\";
     }
 
+    sub SixelGraphics ( $p1, $p2, $p3, $payload ) {
+        my $s = "\eP";
+        $s .= "$p1"  if $p1 >= 0;
+        $s .= ";$p2" if $p2 >= 0;
+        $s .= ";$p3" if $p3 > 0;
+        $s .= "q$payload\e\\";
+        return $s;
+    }
+
+    # In-band resize
+    sub InBandResize ( $height_cells, $width_cells, $height_pixels, $width_pixels ) {
+        $height_cells  = 0 if $height_cells < 0;
+        $width_cells   = 0 if $width_cells < 0;
+        $height_pixels = 0 if $height_pixels < 0;
+        $width_pixels  = 0 if $width_pixels < 0;
+        "\e[48;${height_cells};${width_cells};${height_pixels};${width_pixels}t";
+    }
+
+    # Convert16 - find the nearest 16-color ANSI index for an RGB triplet
+    sub Convert16 ( $r, $g, $b ) {
+        my @ansi16 = (
+            [ 0,   0,   0 ],
+            [ 128, 0,   0 ],
+            [ 0,   128, 0 ],
+            [ 128, 128, 0 ],
+            [ 0,   0,   128 ],
+            [ 128, 0,   128 ],
+            [ 0,   128, 128 ],
+            [ 192, 192, 192 ],
+            [ 128, 128, 128 ],
+            [ 255, 0,   0 ],
+            [ 0,   255, 0 ],
+            [ 255, 255, 0 ],
+            [ 0,   0,   255 ],
+            [ 255, 0,   255 ],
+            [ 0,   255, 255 ],
+            [ 255, 255, 255 ]
+        );
+        my $best      = 0;
+        my $best_dist = ~0;
+        for my $i ( 0 .. $#ansi16 ) {
+            my ( $ar, $ag, $ab ) = @{ $ansi16[$i] };
+            my $dist = ( $r - $ar )**2 + ( $g - $ag )**2 + ( $b - $ab )**2;
+            if ( $dist < $best_dist ) {
+                $best_dist = $dist;
+                $best      = $i;
+            }
+        }
+        return $best;
+    }
+
+    # String width helpers
+    # _char_width($codepoint) returns the width of a single Unicode codepoint
+    sub _char_width ($cp) {
+        if ( $cp < 0x20 )                                { return 0 }
+        if ( $cp == 0x7F )                               { return 0 }
+        if ( $cp >= 0x80 && $cp <= 0x9F )                { return 0 }
+        if ( $cp == 0x0A || $cp == 0x0D || $cp == 0x09 ) { return 0 }
+        if ( $cp >= 0x1100 && $cp <= 0x115F )            { return 2 }
+        if ( $cp == 0x2329 || $cp == 0x232A )            { return 2 }
+        if ( $cp >= 0x2E80 && $cp <= 0x303E )            { return 2 }
+        if ( $cp >= 0x3040 && $cp <= 0x33BF )            { return 2 }
+        if ( $cp >= 0x3400 && $cp <= 0x4DBF )            { return 2 }
+        if ( $cp >= 0x4E00 && $cp <= 0x9FFF )            { return 2 }
+        if ( $cp >= 0xA000 && $cp <= 0xA4CF )            { return 2 }
+        if ( $cp >= 0xAC00 && $cp <= 0xD7AF )            { return 2 }
+        if ( $cp >= 0xF900 && $cp <= 0xFAFF )            { return 2 }
+        if ( $cp >= 0xFE10 && $cp <= 0xFE6F )            { return 2 }
+        if ( $cp >= 0xFF01 && $cp <= 0xFF60 )            { return 2 }
+        if ( $cp >= 0xFFE0 && $cp <= 0xFFE6 )            { return 2 }
+        if ( $cp >= 0x20000 && $cp <= 0x2FFFD )          { return 2 }
+        if ( $cp >= 0x30000 && $cp <= 0x3FFFD )          { return 2 }
+        return 1;
+    }
+
+    # _decode_utf8($str, $pos) decodes one UTF-8 character starting at $pos
+    # Returns ($codepoint, $bytes_consumed)
+    sub _decode_utf8 ( $str, $pos ) {
+        my $b = ord( substr( $str, $pos, 1 ) );
+        if ( $b < 0x80 ) { return ( $b, 1 ) }
+        my $bytes = ( $b & 0xE0 ) == 0xC0 ? 2 : ( $b & 0xF0 ) == 0xE0 ? 3 : ( $b & 0xF8 ) == 0xF0 ? 4 : 1;
+        $bytes = 1 if $bytes > length($str) - $pos;
+        my $cp = $b & ( 0x7F >> ( $bytes - 1 ) );
+        for my $i ( 1 .. $bytes - 1 ) {
+            $cp = ( $cp << 6 ) | ( ord( substr( $str, $pos + $i, 1 ) ) & 0x3F );
+        }
+        return ( $cp, $bytes );
+    }
+
+    # Strip removes ANSI escape codes from a string
+    sub Strip ($s) {
+        $s =~ s/\e\[[\x30-\x3f]*[\x20-\x2f]*[\x40-\x7e]//g;    # CSI sequences
+        $s =~ s/\e\][^\a\x1b]*(?:\a|\x1b\\)//g;                # OSC sequences
+        $s =~ s/\e\[[^\x40-\x7e\x1b]*//g;                      # Incomplete CSI
+        $s =~ s/\x1b[=>78DEHMNOPZ\[\]\\^_`|~]//g;              # ESC + single char
+        $s =~ s/\x1b[()][AB012]//g;                            # ESC ( B etc
+        $s =~ s/\x1b[+*%#][^\x40-\x7e\x1b]*//g;                # ESC intermediate
+        return $s;
+    }
+
+    # _utf8_byte_len($first_byte) returns the number of bytes for a UTF-8 sequence
+    sub _utf8_byte_len ($b) {
+        return 1 if $b < 0x80;
+        return 2 if ( $b & 0xE0 ) == 0xC0;
+        return 3 if ( $b & 0xF0 ) == 0xE0;
+        return 4 if ( $b & 0xF8 ) == 0xF0;
+        return 1;
+    }
+
+    # _skip_ansi($str, $pos) returns the new position after skipping an ANSI sequence
+    # starting at $pos. Returns the position after the sequence.
+    sub _skip_ansi ( $s, $i ) {
+        my $len = length($s);
+        my $esi = $i + 1;
+        my $est = 8;            # EscapeState - we just consumed the ESC byte
+        while ( $esi < $len ) {
+            my $ec = ord( substr( $s, $esi, 1 ) );
+            my $ea = _transition_action( $est, $ec );
+            my $en = _transition_state( $est, $ec );
+            $esi++;
+            last if $ea == 4;
+            $est = $en;
+        }
+        return $esi;
+    }
+
+    # _skip_c1_csi($str, $pos) returns position after skipping C1 CSI (0x9B)
+    sub _skip_c1_csi ( $s, $i ) {
+        my $len = length($s);
+        my $csi = $i + 1;
+        while ( $csi < $len ) {
+            my $cc = ord( substr( $s, $csi, 1 ) );
+            $csi++;
+            last if $cc >= 0x40 && $cc <= 0x7E;
+        }
+        return $csi;
+    }
+
+    # _grapheme_cluster_width($str, $pos) returns (width, bytes_consumed) for the
+    # first grapheme cluster starting at $pos
+    sub _grapheme_cluster_width ( $str, $pos ) {
+        my $len           = length($str);
+        my $total_w       = 0;
+        my $cluster_bytes = 0;
+        my $first         = 1;
+        while ( $pos + $cluster_bytes < $len ) {
+            my $b = ord( substr( $str, $pos + $cluster_bytes, 1 ) );
+
+            # Check for ANSI escape sequences - they have zero width
+            if ( $b == 0x1B ) {
+                $cluster_bytes = _skip_ansi( $str, $pos + $cluster_bytes );
+                next;
+            }
+
+            # Check for C1 control codes (0x80-0x9F) that start sequences
+            if ( $b >= 0x80 && $b <= 0x9F ) {
+                if ( $b == 0x9B ) {    # CSI (C1)
+                    $cluster_bytes = _skip_c1_csi( $str, $pos + $cluster_bytes ) - $pos;
+                    next;
+                }
+                $cluster_bytes++;
+                next;
+            }
+
+            # Regular character
+            my ( $cp, $bytes ) = _decode_utf8( $str, $pos + $cluster_bytes );
+            $cluster_bytes += $bytes;
+            if ($first) {
+                $total_w = _char_width($cp);
+                $first   = 0;
+
+                # Check for combining marks (zero-width)
+                if ( $cp >= 0x0300 && $cp <= 0x036F ) {next}
+                if ( $cp >= 0x1DC0 && $cp <= 0x1DFF ) {next}
+                if ( $cp >= 0x20D0 && $cp <= 0x20FF ) {next}
+                if ( $cp >= 0xFE20 && $cp <= 0xFE2F ) {next}
+
+                # CJK width override: treat wide chars as 2
+                $total_w = 2 if _char_width($cp) == 2;
+            }
+            else {
+                # Combining marks and zero-width joiners don't add width
+                last if _char_width($cp) > 0;
+            }
+        }
+        return ( $total_w || 1, $cluster_bytes || 1 );
+    }
+
+    # _transition_state and _transition_action using simple heuristics
+    # These are simplified versions - for a full implementation use Cancer::Ansi::Parser
+    sub _transition_action ( $state, $byte ) {
+
+        # Simplified: PrintAction=9, ExecuteAction=5, CollectAction=2, DispatchAction=4
+        return 9 if $state == 0 && $byte >= 0x20 && $byte <= 0x7E;                         # Ground + printable
+        return 5 if $state == 0 && ( $byte == 0x0A || $byte == 0x0D || $byte == 0x09 );    # Ground + \n\r\t
+
+        # In EscapeState, '[' enters CSI, 'P' enters DCS, ']' enters OSC - not dispatch
+        return 0
+            if $state == 8 &&
+            ( $byte == ord('[') || $byte == ord('P') || $byte == ord(']') || $byte == ord('X') || $byte == ord('^') || $byte == ord('_') );
+        return 4 if $state == 8 && $byte >= 0x30 && $byte <= 0x7E;                         # Escape + dispatch byte
+        return 4 if $state == 1 && $byte >= 0x40 && $byte <= 0x7E;                         # CSI + final byte
+        return 4 if $state == 3 && $byte >= 0x40 && $byte <= 0x7E;                         # CSI param + final byte
+        return 4 if $state == 2 && $byte >= 0x40 && $byte <= 0x7E;                         # CSI intermediate + final byte
+        return 4 if $state == 5 && $byte >= 0x40 && $byte <= 0x7E;                         # DCS + final byte
+        return 4 if $state == 6 && $byte >= 0x40 && $byte <= 0x7E;                         # DCS param + final byte
+        return 2 if ( $state == 0 || $state == 8 ) && ( $byte & 0xE0 ) == 0xC0;            # Start UTF-8
+        return 2 if ( $state == 0 || $state == 8 ) && ( $byte & 0xF0 ) == 0xE0;
+        return 2 if ( $state == 0 || $state == 8 ) && ( $byte & 0xF8 ) == 0xF0;
+        return 2 if $state == 3 && $byte >= 0x20 && $byte <= 0x2F;                         # CSI intermediate
+        return 0 if $state == 0 && $byte == 0x1B;                                          # ESC
+        return 0                                                                           # default
+    }
+
+    sub _transition_state ( $state, $byte ) {
+        return 14 if $state == 0 && ( $byte & 0xE0 ) == 0xC0;                              # -> Utf8
+        return 14 if $state == 0 && ( $byte & 0xF0 ) == 0xE0;
+        return 14 if $state == 0 && ( $byte & 0xF8 ) == 0xF0;
+        return 14 if $state == 8 && ( $byte & 0xE0 ) == 0xC0;
+        return 14 if $state == 8 && ( $byte & 0xF0 ) == 0xE0;
+        return 14 if $state == 8 && ( $byte & 0xF8 ) == 0xF0;
+        return 0  if $byte == 0x1B;                                                        # -> Escape
+        return 1  if $state == 0 && $byte == 0x9B;                                         # -> CsiEntry (C1)
+        return 1  if $state == 8 && $byte == ord('[');                                     # -> CsiEntry
+        return 0  if $state == 1 && $byte >= 0x40 && $byte <= 0x7E;                        # CSI dispatch -> Ground
+        return 0  if $state == 3 && $byte >= 0x40 && $byte <= 0x7E;                        # CSI param dispatch -> Ground
+        return 0  if $state == 2 && $byte >= 0x40 && $byte <= 0x7E;                        # CSI intermediate dispatch -> Ground
+        return 0  if $state == 5 && $byte >= 0x40 && $byte <= 0x7E;                        # DCS dispatch -> Ground
+        return 0  if $state == 6 && $byte >= 0x40 && $byte <= 0x7E;                        # DCS param dispatch -> Ground
+        return 0  if $state == 8 && $byte >= 0x30 && $byte <= 0x4F;                        # ESC dispatch
+        return 0  if $state == 8 && $byte >= 0x60 && $byte <= 0x7E;
+        return 3  if $state == 1 && $byte >= 0x30 && $byte <= 0x3F;                        # CSI -> param
+        return 3  if $state == 1 && $byte >= 0x20 && $byte <= 0x2F;                        # CSI -> intermediate
+        return 3  if $state == 3 && $byte >= 0x30 && $byte <= 0x3B;                        # CSI param continues
+        return 2  if $state == 3 && $byte >= 0x20 && $byte <= 0x2F;                        # CSI param -> intermediate
+        return $state                                                                      # stay
+    }
+
+    # StringWidth returns the display width of a string, ignoring ANSI codes
+    sub StringWidth ($s) {
+        return 0 if !defined($s) || !length($s);
+        my $len   = length($s);
+        my $width = 0;
+        my $i     = 0;
+        while ( $i < $len ) {
+            my $b = ord( substr( $s, $i, 1 ) );
+
+            # Skip ANSI escape sequences
+            if ( $b == 0x1B ) {
+                $i = _skip_ansi( $s, $i );
+                next;
+            }
+
+            # Skip C1 control sequences
+            if ( $b == 0x9B ) {    # CSI
+                $i = _skip_c1_csi( $s, $i );
+                next;
+            }
+
+            # C1 controls (0x80-0x9F) are zero width
+            if ( $b >= 0x80 && $b <= 0x9F ) {
+                $i++;
+                next;
+            }
+
+            # ASCII printable
+            if ( $b < 0x80 ) {
+                $width++ if $b >= 0x20;
+                $i++;
+                next;
+            }
+
+            # UTF-8 character
+            my ( $cp, $bytes ) = _decode_utf8( $s, $i );
+            $width += _char_width($cp);
+            $i     += $bytes;
+        }
+        return $width;
+    }
+
+    # Hardwrap wraps text to a given width, breaking at any position
+    sub Hardwrap ( $s, $limit, $preserve_space = 0 ) {
+        return $s if $limit < 1;
+        my $out           = '';
+        my $width         = 0;
+        my $len           = length($s);
+        my $i             = 0;
+        my $force_newline = 0;
+        while ( $i < $len ) {
+            my $b = ord( substr( $s, $i, 1 ) );
+
+            # Handle newlines
+            if ( $b == 0x0A ) {
+                $out .= "\n";
+                $width         = 0;
+                $force_newline = 0;
+                $i++;
+                next;
+            }
+
+            # Skip ANSI sequences
+            if ( $b == 0x1B ) {
+                my $end = _skip_ansi( $s, $i );
+                $out .= substr( $s, $i, $end - $i );
+                $i = $end;
+                next;
+            }
+
+            # Skip C1 controls
+            if ( $b == 0x9B ) {
+                my $end = _skip_c1_csi( $s, $i );
+                $out .= substr( $s, $i, $end - $i );
+                $i = $end;
+                next;
+            }
+            if ( $b >= 0x80 && $b <= 0x9F ) {
+                $out .= chr($b);
+                $i++;
+                next;
+            }
+
+            # Regular character
+            my ( $cw, $bytes );
+            if ( $b < 0x80 ) {
+                $cw    = 1;
+                $bytes = 1;
+            }
+            else {
+                ( $cw, $bytes ) = _grapheme_cluster_width( $s, $i );
+            }
+            if ( $width + $cw > $limit ) {
+                $out .= "\n";
+                $width         = 0;
+                $force_newline = 1;
+            }
+            if ( !$preserve_space && $width == 0 && $force_newline && $b == 0x20 ) {
+                $i += $bytes;
+                next;
+            }
+            $force_newline = 0 if $width > 0;
+            $out .= substr( $s, $i, $bytes );
+            $width += $cw if $b >= 0x20;
+            $i     += $bytes;
+        }
+        return $out;
+    }
+
+    # Wordwrap wraps text to a given width, breaking at word boundaries
+    sub Wordwrap ( $s, $limit, $breakpoints = '' ) {
+        return $s if $limit < 1;
+        my $out       = '';
+        my $word      = '';
+        my $space     = '';
+        my $cur_width = 0;
+        my $word_len  = 0;
+        my $len       = length($s);
+        my $i         = 0;
+        my %bp        = map { $_ => 1 } split( //, $breakpoints );
+        my $add_space = sub {
+            $cur_width += _strip_ansi_width($space);
+            $out .= $space;
+            $space = '';
+        };
+        my $add_word = sub {
+            return if !length($word);
+            $add_space->();
+            $cur_width += $word_len;
+            $out .= $word;
+            $word     = '';
+            $word_len = 0;
+        };
+        my $add_newline = sub {
+            $out .= "\n";
+            $cur_width = 0;
+            $space     = '';
+        };
+        while ( $i < $len ) {
+            my $b = ord( substr( $s, $i, 1 ) );
+            if ( $b == 0x0A ) {
+                $add_word->();
+                $add_newline->();
+                $i++;
+                next;
+            }
+
+            # Skip ANSI
+            if ( $b == 0x1B ) {
+                my $end = _skip_ansi( $s, $i );
+                $word .= substr( $s, $i, $end - $i );
+                $i = $end;
+                next;
+            }
+            if ( $b == 0x9B ) {
+                my $end = _skip_c1_csi( $s, $i );
+                $word .= substr( $s, $i, $end - $i );
+                $i = $end;
+                next;
+            }
+            my $bytes = 1;
+            my $cw    = 1;
+            if ( $b >= 0x80 ) {
+                ( $cw, $bytes ) = _grapheme_cluster_width( $s, $i );
+            }
+
+            # Space
+            if ( $b == 0x20 || $b == 0x09 ) {
+                $add_word->();
+                $space .= substr( $s, $i, $bytes );
+                $i += $bytes;
+                next;
+            }
+
+            # Breakpoint
+            if ( $bp{$b} ) {
+                $add_space->();
+                $add_word->();
+                $out .= substr( $s, $i, $bytes );
+                $cur_width += $cw;
+                $i         += $bytes;
+                next;
+            }
+
+            # Regular char
+            $word .= substr( $s, $i, $bytes );
+            $word_len += $cw;
+            if ( $cur_width + _strip_ansi_width($space) + $word_len > $limit && $word_len < $limit ) {
+                $add_newline->();
+            }
+            $i += $bytes;
+        }
+        $add_word->();
+        return $out;
+    }
+
+    sub _strip_ansi_width ($s) {
+        return 0 if !defined($s) || !length($s);
+        my $w   = 0;
+        my $len = length($s);
+        my $i   = 0;
+        while ( $i < $len ) {
+            my $b = ord( substr( $s, $i, 1 ) );
+            if ( $b == 0x1B ) {
+                my $esi = $i + 1;
+                my $est = 0;
+                while ( $esi < $len ) {
+                    my $ec = ord( substr( $s, $esi, 1 ) );
+                    my $ea = _transition_action( $est, $ec );
+                    my $en = _transition_state( $est, $ec );
+                    $esi++;
+                    if ( $ea == 4 ) { $i = $esi; last }
+                    $est = $en;
+                }
+                next if $esi >= $len;
+                next;
+            }
+            $i++;
+        }
+        return $w;
+    }
+
+    # Wrap wraps text to a given width, breaking words only if necessary
+    sub Wrap ( $s, $limit, $breakpoints = '' ) {
+        return $s if $limit < 1;
+        my $out       = '';
+        my $word      = '';
+        my $space     = '';
+        my $word_len  = 0;
+        my $cur_width = 0;
+        my $space_w   = 0;
+        my $len       = length($s);
+        my $i         = 0;
+        my %bp        = map { $_ => 1 } split( //, $breakpoints );
+        my $add_space = sub {
+            $cur_width += $space_w;
+            $out .= $space;
+            $space   = '';
+            $space_w = 0;
+        };
+        my $add_word = sub {
+            return if !length($word);
+            $add_space->();
+            $cur_width += $word_len;
+            $out .= $word;
+            $word     = '';
+            $word_len = 0;
+        };
+        my $add_newline = sub {
+            $out .= "\n";
+            $cur_width = 0;
+            $space     = '';
+            $space_w   = 0;
+        };
+        while ( $i < $len ) {
+            my $b = ord( substr( $s, $i, 1 ) );
+            if ( $b == 0x0A ) {
+                $add_word->();
+                $add_newline->();
+                $i++;
+                next;
+            }
+
+            # Skip ANSI
+            if ( $b == 0x1B ) {
+                my $end = _skip_ansi( $s, $i );
+                $word .= substr( $s, $i, $end - $i );
+                $i = $end;
+                next;
+            }
+            if ( $b == 0x9B ) {
+                my $end = _skip_c1_csi( $s, $i );
+                $word .= substr( $s, $i, $end - $i );
+                $i = $end;
+                next;
+            }
+            my $bytes = 1;
+            my $cw    = 1;
+            if ( $b >= 0x80 ) {
+                ( $cw, $bytes ) = _grapheme_cluster_width( $s, $i );
+            }
+            if ( $b == 0x20 || $b == 0x09 ) {
+                $add_word->();
+                $space .= substr( $s, $i, $bytes );
+                $space_w += $cw;
+                $i       += $bytes;
+                next;
+            }
+            if ( $bp{$b} || $b == ord('-') ) {
+                $add_space->();
+                if ( $cur_width + $word_len >= $limit ) {
+                    $word .= substr( $s, $i, $bytes );
+                    $word_len += $cw;
+                }
+                else {
+                    $add_word->();
+                    $out .= substr( $s, $i, $bytes );
+                    $cur_width += $cw;
+                }
+                $i += $bytes;
+                next;
+            }
+            if ( $word_len + $cw > $limit ) {
+                $add_word->();
+            }
+            $word .= substr( $s, $i, $bytes );
+            $word_len += $cw;
+            if ( $cur_width + $word_len + $space_w > $limit ) {
+                $add_newline->();
+            }
+            if ( $word_len == $limit ) {
+                $add_word->();
+            }
+            $i += $bytes;
+        }
+        $add_word->();
+        return $out;
+    }
+
+    # Truncate truncates a string to a given width, adding a tail
+    sub Truncate ( $s, $length, $tail = '' ) {
+        my $sw = StringWidth($s);
+        return $s if $sw <= $length;
+        my $tw = StringWidth($tail);
+        $length -= $tw;
+        return $tail if $length < 0;
+        my $out      = '';
+        my $width    = 0;
+        my $len      = length($s);
+        my $i        = 0;
+        my $ignoring = 0;
+
+        while ( $i < $len ) {
+            my $b = ord( substr( $s, $i, 1 ) );
+
+            # ANSI sequence - always copy when not ignoring
+            if ( $b == 0x1B ) {
+                my $end = _skip_ansi( $s, $i );
+                $out .= substr( $s, $i, $end - $i ) if !$ignoring;
+                $i = $end;
+                next;
+            }
+            if ( $b == 0x9B ) {
+                my $end = _skip_c1_csi( $s, $i );
+                $out .= substr( $s, $i, $end - $i ) if !$ignoring;
+                $i = $end;
+                next;
+            }
+            my $bytes = 1;
+            my $cw    = 0;
+            if ( $b < 0x80 ) {
+                $cw = 1 if $b >= 0x20;
+            }
+            else {
+                ( $cw, $bytes ) = _grapheme_cluster_width( $s, $i );
+            }
+            $width += $cw;
+            if ( $width > $length && !$ignoring ) {
+                $ignoring = 1;
+                $out .= $tail;
+            }
+            if ( !$ignoring ) {
+                $out .= substr( $s, $i, $bytes );
+            }
+            $i += $bytes;
+        }
+        return $out;
+    }
+
+    # TruncateLeft truncates from the left, adding a prefix
+    sub TruncateLeft ( $s, $n, $prefix = '' ) {
+        return $s if $n <= 0;
+        my $out      = '';
+        my $width    = 0;
+        my $len      = length($s);
+        my $i        = 0;
+        my $ignoring = 1;
+        while ( $i < $len ) {
+            if ( !$ignoring ) {
+                $out .= substr( $s, $i );
+                last;
+            }
+            my $b = ord( substr( $s, $i, 1 ) );
+
+            # ANSI sequence - skip when ignoring
+            if ( $b == 0x1B ) {
+                my $end = _skip_ansi( $s, $i );
+                $i = $end;
+                next;
+            }
+            if ( $b == 0x9B ) {
+                my $end = _skip_c1_csi( $s, $i );
+                $i = $end;
+                next;
+            }
+            my $bytes = 1;
+            my $cw    = 0;
+            if ( $b < 0x80 ) {
+                $cw = 1 if $b >= 0x20;
+            }
+            else {
+                ( $cw, $bytes ) = _grapheme_cluster_width( $s, $i );
+            }
+            $width += $cw;
+            if ( $width > $n && $ignoring ) {
+                $ignoring = 0;
+                $out .= $prefix;
+            }
+            if ( !$ignoring ) {
+                $out .= substr( $s, $i, $bytes );
+            }
+            $i += $bytes;
+        }
+        return $out;
+    }
+
+    # Cut extracts a substring by width range [left, right)
+    sub Cut ( $s, $left, $right ) {
+        return ''                         if $right <= $left;
+        return Truncate( $s, $right, '' ) if $left == 0;
+        return TruncateLeft( Truncate( $s, $right, '' ), $left, '' );
+    }
+
     # Mode
     use constant { ModeNotRecognized => 0, ModeSet => 1, ModeReset => 2, ModePermanentlySet => 3, ModePermanentlyReset => 4 };
     sub mode_is_not_recognized ($m) { 0 + ( $m == ModeNotRecognized ) }
@@ -212,6 +920,14 @@ package Cancer::Ansi v0.0.1 {
         my $pre = mode_is_dec($m) ? '?' : '';
         "\e[${pre}" . mode_num($m) . ";$val" . '$y';
     }
+
+    # Aliases for set_mode/reset_mode/request_mode/report_mode
+    sub SM     (@modes)     { set_mode(@modes) }
+    sub RM     (@modes)     { reset_mode(@modes) }
+    sub DECSET (@modes)     { set_mode(@modes) }
+    sub DECRST (@modes)     { reset_mode(@modes) }
+    sub DECRQM ($m)         { request_mode($m) }
+    sub DECRPM ( $m, $val ) { report_mode( $m, $val ) }
     use constant {
 
         # ANSI Mode Constants ( [number, 0] )
@@ -263,6 +979,107 @@ package Cancer::Ansi v0.0.1 {
         ModeLightDark           => [ 2031, 1 ],
         ModeInBandResize        => [ 2048, 1 ],
         ModeWin32Input          => [ 9001, 1 ],
+
+        # Pre-built mode strings (Set/Reset/Request for each mode)
+        SetModeKeyboardAction           => "\e[2h",
+        ResetModeKeyboardAction         => "\e[2l",
+        RequestModeKeyboardAction       => "\e[2\$p",
+        SetModeInsertReplace            => "\e[4h",
+        ResetModeInsertReplace          => "\e[4l",
+        RequestModeInsertReplace        => "\e[4\$p",
+        SetModeBiDirectionalSupport     => "\e[8h",
+        ResetModeBiDirectionalSupport   => "\e[8l",
+        RequestModeBiDirectionalSupport => "\e[8\$p",
+        SetModeSendReceive              => "\e[12h",
+        ResetModeSendReceive            => "\e[12l",
+        RequestModeSendReceive          => "\e[12\$p",
+        SetModeLocalEcho                => "\e[12h",
+        ResetModeLocalEcho              => "\e[12l",
+        RequestModeLocalEcho            => "\e[12\$p",
+        SetModeLineFeedNewLine          => "\e[20h",
+        ResetModeLineFeedNewLine        => "\e[20l",
+        RequestModeLineFeedNewLine      => "\e[20\$p",
+        SetModeCursorKeys               => "\e[?1h",
+        ResetModeCursorKeys             => "\e[?1l",
+        RequestModeCursorKeys           => "\e[?1\$p",
+        SetModeOrigin                   => "\e[?6h",
+        ResetModeOrigin                 => "\e[?6l",
+        RequestModeOrigin               => "\e[?6\$p",
+        SetModeAutoWrap                 => "\e[?7h",
+        ResetModeAutoWrap               => "\e[?7l",
+        RequestModeAutoWrap             => "\e[?7\$p",
+        SetModeMouseX10                 => "\e[?9h",
+        ResetModeMouseX10               => "\e[?9l",
+        RequestModeMouseX10             => "\e[?9\$p",
+        SetModeTextCursorEnable         => "\e[?25h",
+        ResetModeTextCursorEnable       => "\e[?25l",
+        RequestModeTextCursorEnable     => "\e[?25\$p",
+        SetModeNumericKeypad            => "\e[?66h",
+        ResetModeNumericKeypad          => "\e[?66l",
+        RequestModeNumericKeypad        => "\e[?66\$p",
+        SetModeBackarrowKey             => "\e[?67h",
+        ResetModeBackarrowKey           => "\e[?67l",
+        RequestModeBackarrowKey         => "\e[?67\$p",
+        SetModeLeftRightMargin          => "\e[?69h",
+        ResetModeLeftRightMargin        => "\e[?69l",
+        RequestModeLeftRightMargin      => "\e[?69\$p",
+        SetModeMouseNormal              => "\e[?1000h",
+        ResetModeMouseNormal            => "\e[?1000l",
+        RequestModeMouseNormal          => "\e[?1000\$p",
+        SetModeMouseHighlight           => "\e[?1001h",
+        ResetModeMouseHighlight         => "\e[?1001l",
+        RequestModeMouseHighlight       => "\e[?1001\$p",
+        SetModeMouseButtonEvent         => "\e[?1002h",
+        ResetModeMouseButtonEvent       => "\e[?1002l",
+        RequestModeMouseButtonEvent     => "\e[?1002\$p",
+        SetModeMouseAnyEvent            => "\e[?1003h",
+        ResetModeMouseAnyEvent          => "\e[?1003l",
+        RequestModeMouseAnyEvent        => "\e[?1003\$p",
+        SetModeFocusEvent               => "\e[?1004h",
+        ResetModeFocusEvent             => "\e[?1004l",
+        RequestModeFocusEvent           => "\e[?1004\$p",
+        SetModeMouseExtUtf8             => "\e[?1005h",
+        ResetModeMouseExtUtf8           => "\e[?1005l",
+        RequestModeMouseExtUtf8         => "\e[?1005\$p",
+        SetModeMouseExtSgr              => "\e[?1006h",
+        ResetModeMouseExtSgr            => "\e[?1006l",
+        RequestModeMouseExtSgr          => "\e[?1006\$p",
+        SetModeMouseExtUrxvt            => "\e[?1015h",
+        ResetModeMouseExtUrxvt          => "\e[?1015l",
+        RequestModeMouseExtUrxvt        => "\e[?1015\$p",
+        SetModeMouseExtSgrPixel         => "\e[?1016h",
+        ResetModeMouseExtSgrPixel       => "\e[?1016l",
+        RequestModeMouseExtSgrPixel     => "\e[?1016\$p",
+        SetModeAltScreen                => "\e[?1047h",
+        ResetModeAltScreen              => "\e[?1047l",
+        RequestModeAltScreen            => "\e[?1047\$p",
+        SetModeSaveCursor               => "\e[?1048h",
+        ResetModeSaveCursor             => "\e[?1048l",
+        RequestModeSaveCursor           => "\e[?1048\$p",
+        SetModeAltScreenSaveCursor      => "\e[?1049h",
+        ResetModeAltScreenSaveCursor    => "\e[?1049l",
+        RequestModeAltScreenSaveCursor  => "\e[?1049\$p",
+        SetModeBracketedPaste           => "\e[?2004h",
+        ResetModeBracketedPaste         => "\e[?2004l",
+        RequestModeBracketedPaste       => "\e[?2004\$p",
+        SetModeSynchronizedOutput       => "\e[?2026h",
+        ResetModeSynchronizedOutput     => "\e[?2026l",
+        RequestModeSynchronizedOutput   => "\e[?2026\$p",
+        SetModeUnicodeCore              => "\e[?2027h",
+        ResetModeUnicodeCore            => "\e[?2027l",
+        RequestModeUnicodeCore          => "\e[?2027\$p",
+        SetModeLightDark                => "\e[?2031h",
+        ResetModeLightDark              => "\e[?2031l",
+        RequestModeLightDark            => "\e[?2031\$p",
+        SetModeInBandResize             => "\e[?2048h",
+        ResetModeInBandResize           => "\e[?2048l",
+        RequestModeInBandResize         => "\e[?2048\$p",
+        SetModeWin32Input               => "\e[?9001h",
+        ResetModeWin32Input             => "\e[?9001l",
+        RequestModeWin32Input           => "\e[?9001\$p",
+
+        # DECST8C alias
+        DECST8C => "\e[?5W",
 
         # Mouse
         MouseNone       => 0,
@@ -323,6 +1140,11 @@ package Cancer::Ansi v0.0.1 {
         $y = -$y if $y < 0;
         my $s = $release ? 'm' : 'M';
         "\e[<$b;" . ( $x + 1 ) . ';' . ( $y + 1 ) . $s;
+    }
+
+    sub MouseX10 ( $b, $x, $y ) {
+        my $offset = 32;
+        "\e[M" . chr( $b + $offset ) . chr( $x + $offset + 1 ) . chr( $y + $offset + 1 );
     }
 
     # Notification
@@ -439,6 +1261,26 @@ package Cancer::Ansi v0.0.1 {
     sub ITerm2 ($data) {
         return "\x1b]1337;$data\x07";
     }
+
+    # FinalTerm shell integration
+    sub FinalTerm            (@params) { "\e]133;" . join( ';', @params ) . "\a" }
+    sub FinalTermPrompt      (@params) { FinalTerm( 'A', @params ) }
+    sub FinalTermCmdStart    (@params) { FinalTerm( 'B', @params ) }
+    sub FinalTermCmdExecuted (@params) { FinalTerm( 'C', @params ) }
+    sub FinalTermCmdFinished (@params) { FinalTerm( 'D', @params ) }
+
+    # Termcap/Terminfo
+    sub XTGETTCAP (@caps) {
+        return '' if !@caps;
+        my $s = "\eP+q";
+        for my $i ( 0 .. $#caps ) {
+            $s .= ';' if $i > 0;
+            $s .= uc( unpack( 'H*', $caps[$i] ) );
+        }
+        return $s . "\e\\";
+    }
+    sub RequestTermcap  (@caps) { XTGETTCAP(@caps) }
+    sub RequestTerminfo (@caps) { XTGETTCAP(@caps) }
 
     # Color
     sub color_to_hex_string ($hex) {
@@ -716,13 +1558,6 @@ package Cancer::Ansi v0.0.1 {
         ( $e->{r}, $e->{g}, $e->{b} );
     }
 
-    sub _to6cube ($v) {
-        return 0 if $v < 48;
-        return 1 if $v < 115;
-        return int( ( $v - 35 ) / 40 );
-    }
-    sub _dist_sq ( $r1, $g1, $b1, $r2, $g2, $b2 ) { ( $r1 - $r2 )**2 + ( $g1 - $g2 )**2 + ( $b1 - $b2 )**2 }
-
     sub convert_256 ($hex) {
         my ( $r, $g, $b ) = hex_to_rgb($hex);
         my @q2c = ( 0x00, 0x5f, 0x87, 0xaf, 0xd7, 0xff );
@@ -919,14 +1754,51 @@ package Cancer::Ansi v0.0.1 {
     sub RepeatPreviousCharacter ( $n //= 1 ) { $n > 1 ? "\e[${n}b" : "\e[b" }
     sub REP                     ( $n //= 1 ) { RepeatPreviousCharacter($n) }
 
+    # Focus events
+    use constant { Focus => "\e[I", Blur => "\e[O" };
+
+    # Keypad modes
+    use constant { KeypadApplicationMode => "\e=", DECKPAM => "\e=", KeypadNumericMode => "\e>", DECKPNM => "\e>" };
+
+    # Device Attributes
+    sub PrimaryDeviceAttributes (@attrs) {
+        return "\e[c"  if !@attrs;
+        return "\e[0c" if @attrs == 1 && $attrs[0] == 0;
+        return "\e[?" . join( ';', @attrs ) . "c";
+    }
+    sub DA1 (@attrs) { PrimaryDeviceAttributes(@attrs) }
+    use constant { RequestPrimaryDeviceAttributes => "\e[c" };
+
+    sub SecondaryDeviceAttributes (@attrs) {
+        return "\e[>c" if !@attrs;
+        return "\e[>" . join( ';', @attrs ) . "c";
+    }
+    sub DA2 (@attrs) { SecondaryDeviceAttributes(@attrs) }
+    use constant { RequestSecondaryDeviceAttributes => "\e[>c" };
+
+    sub TertiaryDeviceAttributes ( $unit_id = '' ) {
+        return "\e[=c"  if $unit_id eq '';
+        return "\e[=0c" if $unit_id eq '0';
+        return "\eP!|$unit_id\e\\";
+    }
+    sub DA3 ( $unit_id = '' ) { TertiaryDeviceAttributes($unit_id) }
+    use constant { RequestTertiaryDeviceAttributes => "\e[=c" };
+
+    # Version
+    use constant { RequestNameVersion => "\e[>q", XTVERSION => "\e[>q" };
+
     # Kitty Keyboard Protocol
     # (constants are in Cancer::Ansi::Kitty)
     # Xterm Key Modifier Options
     use constant {
-        SetModifyOtherKeys1  => "\e[>4;1m",
-        SetModifyOtherKeys2  => "\e[>4;2m",
-        ResetModifyOtherKeys => "\e[>4m",
-        QueryModifyOtherKeys => "\e[?4m"
+        SetModifyOtherKeys1    => "\e[>4;1m",
+        SetModifyOtherKeys2    => "\e[>4;2m",
+        ResetModifyOtherKeys   => "\e[>4m",
+        QueryModifyOtherKeys   => "\e[?4m",
+        DisableModifyOtherKeys => "\e[>4;0m",
+        EnableModifyOtherKeys1 => "\e[>4;1m",
+        EnableModifyOtherKeys2 => "\e[>4;2m",
+        RequestModifyOtherKeys => "\e[?4m"
     };
 
     sub KeyModifierOptions ( $p, @vs ) {

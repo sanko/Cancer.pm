@@ -126,7 +126,7 @@ subtest Buffer => sub {
 };
 #
 subtest TabStops => sub {
-    my $tabs = Cancer::CellBuf::TabStops->new(32);
+    my $tabs = Cancer::CellBuf::TabStops->new( width => 32 );
     subtest is_stop => sub {
         is $tabs->is_stop(0),  T(), 'tab at 0';
         is $tabs->is_stop(8),  T(), 'tab at 8';
@@ -153,7 +153,7 @@ subtest TabStops => sub {
         is $tabs->find( 5,   0 ), 5,  'find with delta 0';
     };
     subtest 'custom interval' => sub {
-        my $tab4 = Cancer::CellBuf::TabStops->new( 32, 4 );
+        my $tab4 = Cancer::CellBuf::TabStops->new( width => 32, interval => 4 );
         is $tab4->is_stop(0), T(), 'tab4 at 0';
         is $tab4->is_stop(4), T(), 'tab4 at 4';
         is $tab4->is_stop(8), T(), 'tab4 at 8';
@@ -161,7 +161,7 @@ subtest TabStops => sub {
         is $tab4->is_stop(5), F(), 'not tab4 at 5';
     };
     subtest 'resize' => sub {
-        $tabs = Cancer::CellBuf::TabStops->new(16);
+        $tabs = Cancer::CellBuf::TabStops->new( width => 16 );
         is $tabs->is_stop(8), T(), 'tabs at 8 before resize';
         $tabs->resize(32);
         is $tabs->is_stop(8),  T(), 'tabs at 8 after resize';

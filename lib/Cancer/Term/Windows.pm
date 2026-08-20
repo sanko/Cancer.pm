@@ -47,8 +47,7 @@ package Cancer::Term::Windows v0.0.1 {
             }
         }
     }
-
-    # --- Helpers ---------------------------------------------------------------
+    #
     sub _handle ($fd) {
         my $h = _get_osfhandle($fd);
         return if $h == -1;    # _get_osfhandle returns -1 on error
@@ -69,8 +68,7 @@ package Cancer::Term::Windows v0.0.1 {
     sub _set_console_mode ( $handle, $mode ) {
         return SetConsoleMode( $handle, $mode );
     }
-
-    # --- Public API -----------------------------------------------------------
+    #
     sub is_terminal ( $class, $fd ) {
         return 0 unless $HAS_API;
         my $h = _handle($fd) // return 0;
@@ -134,7 +132,7 @@ package Cancer::Term::Windows v0.0.1 {
         return $pass;
     }
 
-    # --- readPasswordLine (ported from Go util.go) ----------------------------
+    # readPasswordLine (ported from Go util.go)
     sub _read_password_line ($reader) {
         my @ret;
         while ( sysread( $reader, my $byte, 1 ) ) {

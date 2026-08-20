@@ -1,0 +1,142 @@
+=encoding utf8
+
+=head1 NAME
+
+Cancer::ColorProfile - Detect and adapt to terminal color capabilities
+
+=head1 SYNOPSIS
+
+    use Cancer::ColorProfile;
+
+    my $profile = Detect(\*STDOUT);
+    say "Terminal supports: ", Profile_String($profile);
+
+    # Convert a truecolor RGB to the detected profile
+    my $rgb = { type => 'rgb', r => 107, g => 80, b => 255 };
+    my $converted = Convert($profile, $rgb);
+
+    # Detect purely from environment (assumes isatty)
+    my $env_profile = Env();
+
+=head1 DESCRIPTION
+
+Cancer::ColorProfile detects the color capabilities of the terminal and provides color conversion between different
+color depths. It is a port of Go's L<github.com/charmbracelet/colorprofile>.
+
+The module supports five profile levels, from no color at all to full truecolor:
+
+    Unknown   => 0
+    NoTTY     => 1
+    ASCII     => 2
+    ANSI      => 3
+    ANSI256   => 4
+    TrueColor => 5
+
+=head1 FUNCTIONS
+
+=head2 C<Detect( $output, [$environ] )>
+
+Detect the color profile for the given output filehandle and environment. C<$output> is a filehandle (e.g.
+C<\*STDOUT>). C<$environ> is an optional hashref of environment variables (defaults to C<\%ENV>).
+
+Returns a profile constant (0-5).
+
+=head2 C<Env( [$environ] )>
+
+Detect color profile purely from environment variables, assuming the output is a TTY. C<$environ> is an optional
+hashref (defaults to C<\%ENV>).
+
+Returns a profile constant.
+
+=head2 C<Convert( $profile, $color )>
+
+Convert a color hashref to one supported by the given profile. Color hashref formats:
+
+    { type => 'basic', code => 0..15 }
+    { type => '256',   index => 0..255 }
+    { type => 'rgb',   r => 0..255, g => 0..255, b => 0..255 }
+
+Returns C<undef> for profiles that strip all color (NoTTY, ASCII). Returns the color unchanged for TrueColor profiles.
+
+=head2 C<Profile_String( $profile )>
+
+Returns a human-readable string for a profile constant: C<"TrueColor">, C<"ANSI256">, C<"ANSI">, C<"Ascii">,
+C<"NoTTY">, or C<"Unknown">.
+
+=head2 C<Terminfo( $term )>
+
+Detect color profile from the terminfo database for the given terminal name. Requires L<Term::Terminfo> to be
+installed.
+
+=head1 ENVIRONMENT VARIABLES
+
+The following environment variables affect detection:
+
+=over
+
+=item C<NO_COLOR>
+
+If set, disables color output (profile capped to ASCII).
+
+=item C<CLICOLOR>
+
+If set to a true value, enables ANSI color on non-TTY.
+
+=item C<CLICOLOR_FORCE>
+
+If set, forces ANSI color regardless of TTY status.
+
+=item C<TTY_FORCE>
+
+If set, forces TTY detection.
+
+=item C<COLORTERM>
+
+If set to C<truecolor> or C<24bit>, indicates truecolor support.
+
+=item C<TERM>
+
+Terminal type. Known truecolor terminals (e.g. C<alacritty>, C<kitty>, C<wezterm>) are detected automatically.
+
+=item C<TMUX>
+
+If set, indicates tmux is active. Tmux with truecolor support is detected via C<tmux info>.
+
+=item C<WT_SESSION>
+
+If set, indicates Windows Terminal (truecolor).
+
+=item C<GOOGLE_CLOUD_SHELL>
+
+If set to C<1>, indicates Google Cloud Shell (truecolor).
+
+=item C<ConEmuANSI>
+
+If C<ON>, indicates ConEmu with truecolor support.
+
+=item C<ANSICON>
+
+If set on Windows, indicates ANSICON support.
+
+=back
+
+=head1 LICENSE
+
+This software is Copyright (c) 2026 by Sanko Robinson.
+
+This is free software, licensed under:
+
+  The Artistic License 2.0 (GPL Compatible)
+
+See the F<LICENSE> file for full text.
+
+=head1 AUTHOR
+
+Sanko Robinson  L<https://github.com/sanko>
+
+=begin stopwords
+
+
+=end stopwords
+
+=cut

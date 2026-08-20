@@ -1,49 +1,47 @@
 use v5.42;
-
-package Cancer::CellBuf::Pen v0.0.1 {
+use experimental 'class';
+class Cancer::CellBuf::Pen v0.0.1 {
     use Cancer::Ansi qw[ResetStyle set_hyperlink reset_hyperlink];
     use Cancer::CellBuf::Style;
     use Cancer::CellBuf::Link;
+    field $writer : param;
+    field $style = Cancer::CellBuf::Style->new;
+    field $link  = Cancer::CellBuf::Link->new;
+    method style () {$style}
+    method link ()  {$link}
 
-    sub new ( $class, $writer ) {
-        bless { w => $writer, style => Cancer::CellBuf::Style->new, link => Cancer::CellBuf::Link->new }, $class;
-    }
-    sub style ($self) { $self->{style} }
-    sub link  ($self) { $self->{link} }
-
-    sub write ( $self, $data ) {
+    method write ($data) {
         my $out = '';
         for my $byte ( split //, $data ) {
             if ( $byte eq "\n" ) {
-                if ( !$self->{style}->empty ) {
+                if ( !$style->empty ) {
                     $out .= ResetStyle();
                 }
-                if ( !$self->{link}->empty ) {
+                if ( !$link->empty ) {
                     $out .= reset_hyperlink();
                 }
             }
             $out .= $byte;
             if ( $byte eq "\n" ) {
-                if ( !$self->{link}->empty ) {
-                    $out .= set_hyperlink( $self->{link}->url, $self->{link}->params );
+                if ( !$link->empty ) {
+                    $out .= set_hyperlink( $link->url, $link->params );
                 }
-                if ( !$self->{style}->empty ) {
-                    $out .= $self->{style}->sequence;
+                if ( !$style->empty ) {
+                    $out .= $style->sequence;
                 }
             }
         }
-        $self->{w}->print($out) if $self->{w};
+        $writer->print($out) if $writer;
         return length $data;
     }
 
-    sub close ($self) {
-        if ( !$self->{style}->empty ) {
-            $self->{w}->print( ResetStyle() ) if $self->{w};
+    method close () {
+        if ( !$style->empty ) {
+            $writer->print( ResetStyle() ) if $writer;
         }
-        if ( !$self->{link}->empty ) {
-            $self->{w}->print( reset_hyperlink() ) if $self->{w};
+        if ( !$link->empty ) {
+            $writer->print( reset_hyperlink() ) if $writer;
         }
-        $self;
+        return $self;
     }
-}
-1;
+} 1;

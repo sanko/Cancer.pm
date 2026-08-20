@@ -101,7 +101,7 @@ sub sixel_hls ( $h, $l, $s ) {
     return (
         _to16bit( int( ( $rp + $m ) * 255 + 0.5 ) ),
         _to16bit( int( ( $gp + $m ) * 255 + 0.5 ) ),
-        _to16bit( int( ( $bp + $m ) * 255 + 0.5 ) ), 0xFFFF,
+        _to16bit( int( ( $bp + $m ) * 255 + 0.5 ) ), 0xFFFF
     );
 }
 
@@ -128,19 +128,12 @@ my @SIXEL_PALETTE = (
 sub color_rgba ($c) {
     my $pu = $c->{pu} // 0;
     my $pc = $c->{pc} // 0;
-    if ( $pu == 1 ) {
-        return sixel_hls( $c->{px} // 0, $c->{py} // 0, $c->{pz} // 0 );
-    }
-    elsif ( $pu == 2 ) {
-        return sixel_rgb( $c->{px} // 0, $c->{py} // 0, $c->{pz} // 0 );
-    }
-    else {
-        my $p = $SIXEL_PALETTE[$pc] // [ 0, 0, 0 ];
-        return ( _to16bit( $p->[0] ), _to16bit( $p->[1] ), _to16bit( $p->[2] ), 0xFFFF );
-    }
+    return sixel_hls( $c->{px} // 0, $c->{py} // 0, $c->{pz} // 0 ) if $pu == 1;
+    return sixel_rgb( $c->{px} // 0, $c->{py} // 0, $c->{pz} // 0 ) if $pu == 2;
+    my $p = $SIXEL_PALETTE[$pc] // [ 0, 0, 0 ];
+    return ( _to16bit( $p->[0] ), _to16bit( $p->[1] ), _to16bit( $p->[2] ), 0xFFFF );
 }
-
-# -- Tests ---------------------------------------------------------------
+#
 subtest 'TestWriteColor' => sub {
     my @tests = (
         [ 'simple color number', 1, 0, 0,   0,  0,   '#1' ],
