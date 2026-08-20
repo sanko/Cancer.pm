@@ -1,0 +1,81 @@
+=encoding utf8
+
+=head1 NAME
+
+Cancer::CellBuf::Geom - Position and rectangle geometry
+
+=head1 SYNOPSIS
+
+    use Cancer::CellBuf::Geom qw[Pos Rect];
+
+    my $pos = Pos( 5, 10 );
+    my $rect = Rect( 0, 0, 80, 24 );
+
+    # Using OO interface
+    use Cancer::CellBuf::Position;
+    use Cancer::CellBuf::Rectangle;
+
+    my $p = Cancer::CellBuf::Position->new( x => 5, y => 10 );
+    $p->x;  # 5
+    $p->y;  # 10
+
+    my $r = Cancer::CellBuf::Rectangle->new( x => 0, y => 0, width => 80, height => 24 );
+    $r->dx;  # 80
+    $r->dy;  # 24
+    $r->in( $p );  # true
+
+=head1 DESCRIPTION
+
+Provides two interfaces for geometry: lightweight hashref-based functions (Pos, Rect) and OO classes (Position,
+Rectangle). The hashref versions are used internally by the rest of CellBuf.
+
+=head1 FUNCTIONS
+
+Just a little sugar.
+
+=head2 C<Pos( $x, $y )>
+
+Returns a new Cancer::CellBuf::Position object.
+
+=head2 C<Rect( $x, $y, $w, $h )>
+
+Returns a new Cancer::CellBuf::Rectangle object.
+
+=head1 CLASSES
+
+=head2 Cancer::CellBuf::Position
+
+    my $pos = Cancer::CellBuf::Position->new( x => $x, y => $y );
+
+Methods: C<x>, C<y>.
+
+=head2 Cancer::CellBuf::Rectangle
+
+    my $rect = Cancer::CellBuf::Rectangle->new( x => $x, y => $y, width => $w, height => $h );
+
+Methods: C<dx> (width), C<dy> (height), C<in($pos)> (point-in-rect test).
+
+=head1 SEE ALSO
+
+L<Cancer::CellBuf>
+
+=head1 LICENSE
+
+This software is Copyright (c) 2026 by Sanko Robinson.
+
+This is free software, licensed under:
+
+  The Artistic License 2.0 (GPL Compatible)
+
+See the F<LICENSE> file for full text.
+
+=head1 AUTHOR
+
+Sanko Robinson  L<https://github.com/sanko>
+
+=begin stopwords
+
+
+=end stopwords
+
+=cut

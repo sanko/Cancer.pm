@@ -1,0 +1,199 @@
+=encoding utf8
+
+=head1 NAME
+
+Cancer::CellBuf::Screen - Terminal screen renderer
+
+=head1 SYNOPSIS
+
+    use Cancer::CellBuf::Screen;
+    use Cancer::CellBuf::Cell;
+    use Cancer::CellBuf::Geom qw[Rect];
+
+    my $screen = Cancer::CellBuf::Screen->new(
+        writer => \*STDOUT,
+        width  => 80,
+        height => 24,
+        opts   => {
+            term            => $ENV{TERM},
+            alt_screen      => 1,
+            show_cursor     => 1,
+            relative_cursor => 0,
+            hard_tabs       => 0,
+            map_nl          => 0
+        }
+    );
+
+    # Write cells
+    my $style = Cancer::CellBuf::Style->new( fg => { type => 'basic', code => 1 } );
+    my $cell  = Cancer::CellBuf::Cell->new( rune => ord('X'), width => 1, style => $style );
+    $screen->set_cell( 0, 0, $cell );
+
+    # Use Writer functions
+    fill( $screen, BlankCell );
+    set_content( $screen, "Hello\nWorld" );
+
+    # Render and flush
+    $screen->render;
+    $screen->flush;
+
+    # Full lifecycle
+    $screen->enter_alt_screen;
+    $screen->hide_cursor;
+    # ... write cells ...
+    $screen->flush;
+    $screen->close;  # restores alt screen, cursor, flushes
+
+=head1 DESCRIPTION
+
+The Screen is the main rendering engine. It maintains two L<Cancer::CellBuf::Buffer> objects (curbuf = current terminal
+state, newbuf = desired state) and performs incremental diff-based rendering.
+
+Features:
+
+=over
+
+=item * Cursor movement optimization (relative moves)
+
+=item * Scroll optimization via hashmap-based line matching
+
+=item * Alt screen mode with save/restore
+
+=item * Cursor visibility toggling
+
+=item * Cursor flicker reduction
+
+=item * Phantom position handling (auto-wrap at right margin)
+
+=item * Override-optimized cursor movement
+
+=item * Terminal capability detection (VPA, HPA, SU, SD, etc.)
+
+=back
+
+=head1 OPTIONS
+
+    term            - TERM environment value (for capability detection)
+    alt_screen      - Use alternate screen buffer (boolean)
+    show_cursor     - Show cursor (boolean, default: true)
+    relative_cursor - Use relative cursor movement (boolean)
+    hard_tabs       - Use hard tab characters (boolean)
+    map_nl          - Map newline to carriage return (boolean)
+    backspace       - Use backspace characters for left movement (boolean)
+
+=head1 FUNCTIONS
+
+=head2 new( %args )
+
+Creates a new Screen.
+
+    writer - Filehandle, glob ref, or object with print() method
+    width  - Terminal width (auto-detected if not given)
+    height - Terminal height (auto-detected if not given)
+    opts   - Hashref of options (see OPTIONS)
+
+=head2 width, height, bounds
+
+Terminal dimensions.
+
+=head2 C<cell( $x, $y )>
+
+Returns the Cell at (C<$x>, C<$y>) from the new buffer.
+
+=head2 C<set_cell( $x, $y, $cell )>
+
+Sets a cell and marks the line as touched.
+
+=head2 C<fill( $cell )>
+
+=head2 C<fill_rect( $cell, $rect )>
+
+Fill operations on the new buffer.
+
+=head2 C<clear( )>
+
+=head2 C<clear_rect( $rect )>
+
+Clear operations on the new buffer.
+
+=head2 C<move_to( $x, $y )>
+
+Sets the cursor position for the next render.
+
+=head2 C<insert_above( $str )>
+
+Queues text to be inserted above the current screen content (non-alt-screen only).
+
+=head2 C<resize( $width, $height )>
+
+Resizes the screen and buffers.
+
+=head2 C<redraw( )>
+
+Forces a full redraw on next render.
+
+=head2 C<show_cursor( )>
+
+=head2 C<hide_cursor( )>
+
+Toggles cursor visibility.
+
+=head2 C<enter_alt_screen( )>
+
+=head2 C<exit_alt_screen( )>
+
+Enters/exits alternate screen buffer mode.
+
+=head2 C<render( )>
+
+Renders changes to the internal buffer. Called automatically by flush.
+
+=head2 C<flush( )>
+
+Renders and writes the buffer to the writer.
+
+=head2 C<close( )>
+
+Restores terminal state (alt screen off, cursor visible) and flushes.
+
+=head1 TERMINAL CAPABILITIES
+
+Screen detects terminal capabilities based on the C<term> option:
+
+    CAP_VPA  - Vertical Position Absolute (cursor positioning)
+    CAP_HPA  - Horizontal Position Absolute
+    CAP_CHT  - Cursor Horizontal Tab
+    CAP_CBT  - Cursor Backward Tab
+    CAP_REP  - Repeat Previous Character
+    CAP_ECH  - Erase Character
+    CAP_ICH  - Insert Character
+    CAP_SD   - Scroll Down
+    CAP_SU   - Scroll Up
+
+Known terminals with full capabilities: contour, foot, ghostty, kitty, rio, st, tmux, wezterm, xterm. Alacritty has all
+except CAP_CHT. Screen has all except CAP_REP. Linux console has CAP_VPA, CAP_HPA, CAP_ECH, CAP_ICH only.
+
+=head1 SEE ALSO
+
+L<Cancer::CellBuf::Buffer>, L<Cancer::CellBuf::Style>, L<Cancer::Ansi>
+
+=head1 LICENSE
+
+This software is Copyright (c) 2026 by Sanko Robinson.
+
+This is free software, licensed under:
+
+  The Artistic License 2.0 (GPL Compatible)
+
+See the F<LICENSE> file for full text.
+
+=head1 AUTHOR
+
+Sanko Robinson  L<https://github.com/sanko>
+
+=begin stopwords
+
+
+=end stopwords
+
+=cut

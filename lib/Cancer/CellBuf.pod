@@ -1,0 +1,114 @@
+=encoding utf8
+
+=head1 NAME
+
+Cancer::CellBuf - Cell-based terminal buffer and screen rendering
+
+=head1 SYNOPSIS
+
+    use Cancer::CellBuf qw[:all];
+
+    # Create a screen with dimensions
+    my $screen = Cancer::CellBuf::Screen->new(
+        width  => 80,
+        height => 24,
+        writer => \*STDOUT,
+        opts   => {
+            alt_screen  => 1,
+            show_cursor => 1,
+        },
+    );
+
+    # Write styled content
+    my $style = Cancer::CellBuf::Style->new( fg => { type => 'basic', code => 1 } );
+    my $cell  = Cancer::CellBuf::Cell->new( rune => ord('H'), width => 1, style => $style );
+
+    $screen->set_cell( 0, 0, $cell );
+    $screen->set_cell( 1, 0, BlankCell );
+
+    # Render changes to the terminal
+    $screen->render;
+    $screen->flush;
+
+    # Or use Writer functions directly
+    my $buf = Cancer::CellBuf::Buffer->new( 80, 24 );
+    fill( $buf, BlankCell );
+    set_content( $buf, "Hello, World!\n" );
+
+=head1 DESCRIPTION
+
+Cancer::CellBuf provides a cell-based terminal rendering library ported from Go's L<charmbracelet/x/cellbuf>. It
+maintains two buffers (current and new) and performs incremental diff-based rendering to update the terminal with
+minimal escape sequences.
+
+The library supports:
+
+=over
+
+=item * Styled cells with colors (basic, 256-color, RGB) and attributes
+
+=item * Hyperlinks via OSC 8
+
+=item * Wide characters (CJK)
+
+=item * ANSI-aware text wrapping with configurable break points
+
+=item * Scroll optimization via hashmap-based line matching
+
+=item * Alt screen mode for full-screen applications
+
+=item * Tab stops
+
+=back
+
+=head1 FUNCTIONS
+
+=head2 BlankCell
+
+Returns the singleton blank cell (space character, width 1).
+
+=head2 EmptyCell
+
+Returns the singleton empty cell (width 0, no rune).
+
+=head1 MODULES
+
+=over
+
+=item L<Cancer::CellBuf::Cell> - Terminal cell
+
+=item L<Cancer::CellBuf::Line> - Row of cells
+
+=item L<Cancer::CellBuf::Buffer> - 2D cell grid
+
+=item L<Cancer::CellBuf::Screen> - Screen renderer
+
+=item L<Cancer::CellBuf::Style> - Cell styling
+
+=item L<Cancer::CellBuf::Link> - Hyperlinks
+
+=item L<Cancer::CellBuf::Geom> - Geometry (Pos, Rect)
+
+=item L<Cancer::CellBuf::TabStops> - Tab stop management
+
+=item L<Cancer::CellBuf::Writer> - Buffer writing functions
+
+=item L<Cancer::CellBuf::Wrap> - ANSI-aware text wrapping
+
+=item L<Cancer::CellBuf::Pen> - PenWriter for style-aware output
+
+=back
+
+=head1 AUTHOR
+
+Cancer Contributors
+
+=head1 LICENSE
+
+This library is free software; you can redistribute it and/or modify it under the same terms as Perl itself.
+
+=head1 SEE ALSO
+
+L<Cancer::Ansi>, L<Cancer::Ansi::Parser>
+
+=cut

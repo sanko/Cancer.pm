@@ -1,0 +1,95 @@
+=encoding utf8
+
+=head1 NAME
+
+Cancer::CellBuf::Writer - Buffer writing functions
+
+=head1 SYNOPSIS
+
+    use Cancer::CellBuf::Writer qw[:all];
+    use Cancer::CellBuf::Buffer;
+    use Cancer::CellBuf::Geom qw[Rect];
+
+    my $buf = Cancer::CellBuf::Buffer->new( width => 80, height => 24 );
+
+    fill( $buf, BlankCell );                    # fill entire buffer
+    fill_rect( $buf, BlankCell, Rect(0, 0, 40, 12) );  # fill rect
+
+    clear( $buf );                              # clear entire buffer
+    clear_rect( $buf, Rect(0, 0, 80, 24) );       # clear rect
+
+    set_content( $buf, "Hello\nWorld" );        # set string content
+    set_content_rect( $buf, 'Hi', Rect(0, 0, 10, 1) );
+
+    my $output = render( $buf );                # render to string
+    my ( $width, $line ) = render_line( $buf, 0 );  # render single line
+
+=head1 DESCRIPTION
+
+Provides functional interfaces for writing to and rendering from a Buffer. These functions are used by Screen
+internally and can also be used for standalone buffer manipulation.
+
+=head1 EXPORTS
+
+    fill_rect, fill, clear_rect, clear,
+    set_content_rect, set_content,
+    render, render_line
+
+=head1 FUNCTIONS
+
+=head2 C<fill( $cell )>
+
+Fills the entire buffer with clones of C<$cell>.
+
+=head2 C<fill_rect( $cell, $rect )>
+
+Fills the rectangle with clones of C<$cell>.
+
+=head2 C<clear( )>
+
+Clears the entire buffer.
+
+=head2 C<clear_rect( $rect )>
+
+Clears the rectangle.
+
+=head2 C<set_content( $str )>
+
+Sets the buffer content from a string. Handles C<\n> newlines and C<\r\n> line endings.
+
+=head2 C<set_content_rect( $str, $rect )>
+
+Sets content within the given rectangle.
+
+=head2 C<render( )>
+
+Returns the entire buffer as a rendered string.
+
+=head2 C<render_line( $n )>
+
+Returns C<( $width, $string )> for line C<$n>. Style and hyperlink sequences are embedded in the output string.
+
+=head1 SEE ALSO
+
+L<Cancer::CellBuf::Buffer>, L<Cancer::CellBuf::Screen>
+
+=head1 LICENSE
+
+This software is Copyright (c) 2026 by Sanko Robinson.
+
+This is free software, licensed under:
+
+  The Artistic License 2.0 (GPL Compatible)
+
+See the F<LICENSE> file for full text.
+
+=head1 AUTHOR
+
+Sanko Robinson  L<https://github.com/sanko>
+
+=begin stopwords
+
+
+=end stopwords
+
+=cut

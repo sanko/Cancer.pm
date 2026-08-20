@@ -1,0 +1,125 @@
+=encoding utf8
+
+=head1 NAME
+
+Cancer::CellBuf::Buffer - 2D cell grid
+
+=head1 SYNOPSIS
+
+    use Cancer::CellBuf::Buffer;
+    use Cancer::CellBuf::Cell;
+
+    my $buf = Cancer::CellBuf::Buffer->new( width => 80, height => 24 );
+
+    $buf->width;   # 80
+    $buf->height;  # 24
+    $buf->bounds;  # Rect(0, 0, 80, 24)
+
+    my $cell = Cancer::CellBuf::Cell->new( rune => ord('X'), width => 1 );
+    $buf->set_cell( 5, 10, $cell );
+    my $c = $buf->cell( 5, 10 );   # returns $cell
+
+    my $line = $buf->line( 10 );   # returns Line at y=10
+
+    $buf->fill( BlankCell );
+    $buf->clear;
+
+    $buf->resize( 120, 40 );
+
+=head1 DESCRIPTION
+
+A Buffer is a 2D grid of L<Cancer::CellBuf::Cell> objects, stored as an array of L<Cancer::CellBuf::Line> objects. This
+is the fundamental data structure for both the "current" (what the terminal shows) and "new" (what we want) buffers in
+Screen rendering.
+
+=head1 FUNCTIONS
+
+=head2 C<new( [...] )>
+
+Creates a new buffer. If C<width> and C<height> are > 0, the buffer is pre-filled.
+
+=head2 C<width( )>
+
+
+=head2 C<height( )>
+
+=head2 C<bounds( )>
+
+Dimensions and bounding rectangle.
+
+=head2 C<line( $y )>
+
+Returns the Line at row C<$y>, or C<undef> if out of bounds.
+
+=head2 C<cell( $x, $y )>
+
+Returns the Cell at column C<$x>, row C<$y>, or C<undef> if out of bounds.
+
+=head2 C<set_cell( $x, $y, $cell )>
+
+Sets the cell at (C<$x>, C<$y>). Returns 1 on success, 0 if out of bounds.
+
+=head2 C<fill_rect( $cell, $rect )>
+
+Fills the rectangle C<$rect> with clones of C<$cell>.
+
+=head2 C<fill( $cell )>
+
+Fills the entire buffer.
+
+=head2 C<clear_rect( $rect )>
+
+Clears the rectangle (fills with undef).
+
+=head2 C<clear( )>
+
+Clears the entire buffer.
+
+=head2 C<insert_line( $y, $n, $cell )>
+
+Inserts C<$n> lines at row C<$y>, shifting content down. Fills new lines with C<$cell> (or blank).
+
+=head2 C<insert_line_rect( $y, $n, $cell, $rect )>
+
+Inserts lines within the given rectangle.
+
+=head2 C<delete_line( $y, $n, $cell )>
+
+Deletes C<$n> lines at row C<$y>, shifting content up. Fills bottom with C<$cell> (or blank).
+
+=head2 C<delete_line_rect( $y, $n, $cell, $rect )>
+
+Deletes lines within the given rectangle.
+
+=head2 C<resize( $width, $height )>
+
+Resizes the buffer. Content is preserved (truncated or extended with blanks).
+
+=head2 C<string( )>
+
+Returns all lines as a string (newline-separated).
+
+=head1 SEE ALSO
+
+L<Cancer::CellBuf::Line>, L<Cancer::CellBuf::Cell>, L<Cancer::CellBuf::Screen>
+
+=head1 LICENSE
+
+This software is Copyright (c) 2026 by Sanko Robinson.
+
+This is free software, licensed under:
+
+  The Artistic License 2.0 (GPL Compatible)
+
+See the F<LICENSE> file for full text.
+
+=head1 AUTHOR
+
+Sanko Robinson  L<https://github.com/sanko>
+
+=begin stopwords
+
+
+=end stopwords
+
+=cut

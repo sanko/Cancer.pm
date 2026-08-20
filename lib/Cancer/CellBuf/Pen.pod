@@ -1,0 +1,69 @@
+=encoding utf8
+
+=head1 NAME
+
+Cancer::CellBuf::Pen - Style-aware writer
+
+=head1 SYNOPSIS
+
+    use Cancer::CellBuf::Pen;
+    use Cancer::CellBuf::Writer qw[render];
+
+    my $pen = Cancer::CellBuf::Pen->new( $writer );
+    $pen->style->set_bold(1);
+    $pen->link->url( 'https://example.com' );
+    $pen->write("Hello\n");
+    $pen->close;
+
+=head1 DESCRIPTION
+
+A PenWriter maintains a current style and link, and wraps write operations to handle style/link resets across newlines.
+On C<\n>, the current style and link are reset before the newline and restored after it, ensuring correct terminal
+state for the next line.
+
+=head1 FUNCTIONS
+
+=head2 C<new( $writer )>
+
+Creates a new Pen. C<$writer> is an object with a C<print> method (or undef to disable output).
+
+=head2 C<style( )>
+
+Returns the current L<Cancer::CellBuf::Style>.
+
+=head2 C<link( )>
+
+Returns the current L<Cancer::CellBuf::Link>.
+
+=head2 C<write( $data )>
+
+Writes C<$data>, handling newlines. Returns the length of C<$data>.
+
+=head2 C<close( )>
+
+Resets any active style and hyperlink on the writer.
+
+=head1 SEE ALSO
+
+L<Cancer::CellBuf::Screen>
+
+=head1 LICENSE
+
+This software is Copyright (c) 2026 by Sanko Robinson.
+
+This is free software, licensed under:
+
+  The Artistic License 2.0 (GPL Compatible)
+
+See the F<LICENSE> file for full text.
+
+=head1 AUTHOR
+
+Sanko Robinson  L<https://github.com/sanko>
+
+=begin stopwords
+
+
+=end stopwords
+
+=cut

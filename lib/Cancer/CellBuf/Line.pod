@@ -1,0 +1,77 @@
+=encoding utf8
+
+=head1 NAME
+
+Cancer::CellBuf::Line - Row of terminal cells
+
+=head1 SYNOPSIS
+
+    use Cancer::CellBuf::Line;
+    use Cancer::CellBuf::Cell;
+
+    my $blank = Cancer::CellBuf::Cell::BlankCell();
+    my $line = Cancer::CellBuf::Line->new( ($blank) x 80 );
+
+    $line->width;   # 80
+    $line->at(0);   # returns BlankCell (or undef for out-of-bounds)
+
+    my $cell = Cancer::CellBuf::Cell->new( rune => ord('X'), width => 1 );
+    $line->set( 5, $cell );
+
+    my $str = $line->string;  # trailing spaces trimmed
+
+=head1 DESCRIPTION
+
+A Line is an array of L<Cancer::CellBuf::Cell> objects representing a single row in a buffer. It handles wide character
+placement and overwriting.
+
+=head1 FUNCTIONS
+
+=head2 C<new( @cells )>
+
+Creates a new Line from an array of Cell objects (or C<undef>).
+
+=head2 C<width( )>
+
+
+=head2 C<len( )>
+
+Returns the number of cell positions in the line.
+
+=head2 C<at( $x )>
+
+Returns the cell at position C<$x>, or C<undef> if out of bounds. Returns BlankCell if the position is C<undef>.
+
+=head2 C<set( $x, $cell )>
+
+Sets the cell at position C<$x>, cloning C<$cell>. Handles wide character placeholders and overwrites. Returns 1 on
+success, 0 if out of bounds.
+
+=head2 C<string( )>
+
+Returns the line as a string (trailing spaces trimmed).
+
+=head1 SEE ALSO
+
+L<Cancer::CellBuf::Cell>, L<Cancer::CellBuf::Buffer>
+
+=head1 LICENSE
+
+This software is Copyright (c) 2026 by Sanko Robinson.
+
+This is free software, licensed under:
+
+  The Artistic License 2.0 (GPL Compatible)
+
+See the F<LICENSE> file for full text.
+
+=head1 AUTHOR
+
+Sanko Robinson  L<https://github.com/sanko>
+
+=begin stopwords
+
+
+=end stopwords
+
+=cut

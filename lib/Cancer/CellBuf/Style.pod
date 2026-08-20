@@ -1,0 +1,146 @@
+=encoding utf8
+
+=head1 NAME
+
+Cancer::CellBuf::Style - Text styling (colors, attributes, underlines)
+
+=head1 SYNOPSIS
+
+    use Cancer::CellBuf::Style;
+
+    my $style = Cancer::CellBuf::Style->new(
+        fg    => { type => 'basic', code => 1 },
+        bg    => { type => '256',   index => 196 },
+        ul    => { type => 'rgb',   r => 255, g => 0, b => 0 },
+        attrs => 0,
+        ul_style => Cancer::CellBuf::Style::SINGLE_UNDERLINE()
+    );
+
+    $style->set_bold(1);
+    $style->set_fg( { type => 'basic', code => 2 } );
+    $style->set_bg( { type => 'rgb', r => 0, g => 0, b => 0 } );
+
+    my $seq = $style->sequence;       # Full SGR sequence
+    my $diff = $style->diff_sequence($old_style);  # Minimal diff
+
+    $style->reset;
+
+=head1 DESCRIPTION
+
+Represents cell styling including foreground/background/underline colors, text attributes (bold, italic, etc.), and
+underline styles. Generates SGR escape sequences for terminal output.
+
+Colors are hashrefs with a C<type> key:
+
+    { type => 'basic', code => 0..15 }
+    { type => '256',   index => 0..255 }
+    { type => 'rgb',   r => 0..255, g => 0..255, b => 0..255 }
+
+=head1 EXPORTS
+
+The following constants are available on request:
+
+    BOLD_ATTR, FAINT_ATTR, ITALIC_ATTR, SLOW_BLINK_ATTR,
+    RAPID_BLINK_ATTR, REVERSE_ATTR, CONCEAL_ATTR,
+    STRIKETHROUGH_ATTR, RESET_ATTR
+
+    NO_UNDERLINE, SINGLE_UNDERLINE, DOUBLE_UNDERLINE,
+    CURLY_UNDERLINE, DOTTED_UNDERLINE, DASHED_UNDERLINE
+
+=head1 FUNCTIONS
+
+=head2 new( ... )
+
+Creates a new Style. All fields are optional:
+
+    fg       - Foreground color hashref
+    bg       - Background color hashref
+    ul       - Underline color hashref
+    attrs    - Attribute bitmask (default: RESET_ATTR)
+    ul_style - Underline style constant (default: NO_UNDERLINE)
+
+=head2 C<set_bold( $v )>
+
+
+=head2 C<set_faint( $v )>
+
+
+=head2 C<set_italic( $v )>
+
+
+=head2 C<set_slow_blink( $v )>
+
+=head2 C<set_rapid_blink( $v )>
+
+=head2 C<set_reverse( $v )>
+
+=head2 C<set_conceal( $v )>
+
+=head2 C<set_strikethrough( $v )>
+
+Enable (1) or disable (0) the given attribute.
+
+=head2 C<set_underline_style( $style )>
+
+Set the underline style to one of the underline constants.
+
+=head2 C<set_underline( $v )>
+
+Convenience: enables SINGLE_UNDERLINE (1) or NO_UNDERLINE (0).
+
+=head2 C<set_fg( $color )>
+
+=head2 C<set_bg( $color )>
+
+=head2 C<set_ul( $color )>
+
+Set the foreground, background, or underline color (or C<undef> to reset).
+
+=head2 C<sequence( )>
+
+Returns the full SGR escape sequence for this style.
+
+=head2 C<diff_sequence( $old )>
+
+Returns the minimal SGR sequence to transition from C<$old> to C<$self>.
+
+=head2 C<empty( )>
+
+Returns true if the style has no colors, attributes, or underline styles set.
+
+=head2 C<clear( )>
+
+Returns true if the style represents a "clear" state (allows short reset).
+
+=head2 C<equal( $other )>
+
+Returns true if C<$other> has identical styling.
+
+=head2 C<clone( )>
+
+Returns a deep copy.
+
+=head1 SEE ALSO
+
+L<Cancer::Ansi>, L<Cancer::CellBuf::Cell>
+
+=head1 LICENSE
+
+This software is Copyright (c) 2026 by Sanko Robinson.
+
+This is free software, licensed under:
+
+  The Artistic License 2.0 (GPL Compatible)
+
+See the F<LICENSE> file for full text.
+
+=head1 AUTHOR
+
+Sanko Robinson  L<https://github.com/sanko>
+
+=begin stopwords
+
+
+=end stopwords
+
+=cut

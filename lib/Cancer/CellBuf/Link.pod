@@ -1,0 +1,81 @@
+=encoding utf8
+
+=head1 NAME
+
+Cancer::CellBuf::Link - OSC 8 hyperlink
+
+=head1 SYNOPSIS
+
+    use Cancer::CellBuf::Link;
+
+    my $link = Cancer::CellBuf::Link->new(
+        url    => 'https://example.com',
+        params => 'id=1'
+    );
+
+    $link->url;     # 'https://example.com'
+    $link->params;  # 'id=1'
+    $link->empty;   # false
+
+    my $clone = $link->clone;
+
+=head1 DESCRIPTION
+
+Represents an OSC 8 hyperlink attached to a cell. Stores the URL and optional parameters used in the C<\e]8;;URI\e\\>
+sequence.
+
+=head1 FUNCTIONS
+
+=head2 C<new( %args )>
+
+    url    - The hyperlink URL (default: '')
+    params - Optional params string (default: '')
+
+=head2 C<url( )>
+
+Returns the URL.
+
+=head2 C<params( )>
+
+Returns the params string.
+
+=head2 C<empty( )>
+
+Returns true if both url and params are empty.
+
+=head2 C<reset( )>
+
+Resets url and params to empty strings. Returns C<$self>.
+
+=head2 C<equal( $other )>
+
+Returns true if C<$other> has the same url and params (or is the same reference).
+
+=head2 C<clone( )>
+
+Returns a shallow copy.
+
+=head1 SEE ALSO
+
+L<Cancer::CellBuf::Cell>
+
+=head1 LICENSE
+
+This software is Copyright (c) 2026 by Sanko Robinson.
+
+This is free software, licensed under:
+
+  The Artistic License 2.0 (GPL Compatible)
+
+See the F<LICENSE> file for full text.
+
+=head1 AUTHOR
+
+Sanko Robinson  L<https://github.com/sanko>
+
+=begin stopwords
+
+
+=end stopwords
+
+=cut

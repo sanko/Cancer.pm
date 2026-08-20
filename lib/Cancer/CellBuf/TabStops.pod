@@ -1,0 +1,93 @@
+=encoding utf8
+
+=head1 NAME
+
+Cancer::CellBuf::TabStops - Tab stop management
+
+=head1 SYNOPSIS
+
+    use Cancer::CellBuf::TabStops;
+
+    my $tabs = Cancer::CellBuf::TabStops->new( 80, 8 );  # width, interval
+    my $tabs = Cancer::CellBuf::TabStops->default( 80 );  # interval = 8
+
+    $tabs->set(16);        # set tab stop at column 16
+    $tabs->reset(16);      # remove tab stop at column 16
+    $tabs->is_stop(8);     # true (default stop)
+
+    $tabs->next(5);        # next tab stop from column 5
+    $tabs->prev(15);       # previous tab stop from column 15
+
+    $tabs->resize(120);    # resize to 120 columns
+
+=head1 DESCRIPTION
+
+Manages tab stop positions using a compact bitmask representation. By default, tab stops are placed every 8 columns
+(positions 0, 8, 16, ...).
+
+=head1 EXPORTS
+
+Nothing by default. C<DEFAULT_TAB_INTERVAL> (8) available on request.
+
+=head1 FUNCTIONS
+
+=head2 C<new( $width, $interval )>
+
+Creates a new TabStops for C<$width> columns with stops every C<$interval> columns.
+
+=head2 C<default( $width )>
+
+Creates with interval 8.
+
+=head2 C<set( $col )>
+
+Sets a tab stop at column C<$col>.
+
+=head2 C<reset( $col )>
+
+Removes the tab stop at column C<$col>.
+
+=head2 C<is_stop( $col )>
+
+Returns true if there is a tab stop at column C<$col>.
+
+=head2 C<next( $col )>
+
+Returns the next tab stop at or after column C<$col>.
+
+=head2 C<prev( $col )>
+
+Returns the previous tab stop at or before column C<$col>.
+
+=head2 C<find( $col, $delta )>
+
+Finds a tab stop C<$delta> positions from C<$col> (positive = forward, negative = backward).
+
+=head2 C<resize( $width )>
+
+Resizes for C<$width> columns.
+
+=head1 SEE ALSO
+
+L<Cancer::CellBuf::Screen>
+
+=head1 LICENSE
+
+This software is Copyright (c) 2026 by Sanko Robinson.
+
+This is free software, licensed under:
+
+  The Artistic License 2.0 (GPL Compatible)
+
+See the F<LICENSE> file for full text.
+
+=head1 AUTHOR
+
+Sanko Robinson  L<https://github.com/sanko>
+
+=begin stopwords
+
+
+=end stopwords
+
+=cut

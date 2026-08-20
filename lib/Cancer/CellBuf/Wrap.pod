@@ -1,0 +1,73 @@
+=encoding utf8
+
+=head1 NAME
+
+Cancer::CellBuf::Wrap - ANSI-aware text wrapping
+
+=head1 SYNOPSIS
+
+    use Cancer::CellBuf::Wrap qw[wrap_text];
+
+    my $wrapped = wrap_text( 'Hello World', 10 );
+
+    # With ANSI styles
+    my $styled = wrap_text( "\e[31mRed\e[0m text", 10 );
+
+    # With custom break points
+    my $result = wrap_text( 'foo-bar', 5, '/' );
+
+=head1 DESCRIPTION
+
+Wraps styled text to fit within a column limit, respecting ANSI escape sequences and hyperlink sequences. Break points
+can be configured (default: spaces and hyphens).
+
+ANSI SGR sequences (C<\e[...m>) are parsed and tracked in the current style. OSC 8 hyperlink sequences are also
+handled. All zero-width sequences pass through transparently during wrapping.
+
+=head1 FUNCTIONS
+
+=head2 C<wrap_text( $str, $limit, $breakpoints )>
+
+Wraps C<$str> to C<$limit> columns. C<$breakpoints> is a string of additional break characters (in addition to space
+and hyphen). Returns the wrapped string with embedded ANSI/hyperlink sequences.
+
+Behavior:
+
+=over
+
+=item * Words are broken at spaces, hyphens, and custom break characters.
+
+=item * If a single word exceeds the limit, it is placed on its own line.
+
+=item * Styles are reset at line breaks and re-applied at the start of the next line.
+
+=item * Hyperlinks are similarly reset/re-applied.
+
+=item * Tab characters are treated as spaces.
+
+=back
+
+=head1 SEE ALSO
+
+L<Cancer::Ansi::Parser>, L<Cancer::CellBuf::Style>
+
+=head1 LICENSE
+
+This software is Copyright (c) 2026 by Sanko Robinson.
+
+This is free software, licensed under:
+
+  The Artistic License 2.0 (GPL Compatible)
+
+See the F<LICENSE> file for full text.
+
+=head1 AUTHOR
+
+Sanko Robinson  L<https://github.com/sanko>
+
+=begin stopwords
+
+
+=end stopwords
+
+=cut

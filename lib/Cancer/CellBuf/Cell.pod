@@ -1,0 +1,129 @@
+=encoding utf8
+
+=head1 NAME
+
+Cancer::CellBuf::Cell - Terminal cell
+
+=head1 SYNOPSIS
+
+    use Cancer::CellBuf::Cell;
+
+    my $cell = Cancer::CellBuf::Cell->new(
+        rune  => ord('A'),
+        width => 1,
+        style => $style,
+        link  => $link,
+    );
+
+    $cell->rune;    # 65
+    $cell->width;   # 1
+    $cell->string;  # 'A'
+
+    my $blank = Cancer::CellBuf::Cell::BlankCell();  # space, width 1
+    my $empty = Cancer::CellBuf::Cell::EmptyCell();  # no rune, width 0
+
+    my $clone = $cell->clone;
+
+=head1 DESCRIPTION
+
+A cell represents a single character position in the terminal. It stores:
+
+=over
+
+=item * C<rune> - The character codepoint (numeric)
+
+=item * C<comb> - Arrayref of combining character codepoints
+
+=item * C<width> - Display width (0 for placeholders, 1 for normal, 2 for wide)
+
+=item * C<style> - A L<Cancer::CellBuf::Style> object (or undef)
+
+=item * C<link> - A L<Cancer::CellBuf::Link> object (or undef)
+
+=back
+
+Cells with width > 1 (wide characters) occupy multiple positions; trailing positions have width 0 as placeholders.
+
+=head1 FUNCTIONS
+
+=head2 C<new( %args )>
+
+Creates a new Cell. All args optional with defaults:
+
+    rune  => 0, comb => [], width => 0, style => undef, link => undef
+
+=head2 C<rune( )>
+
+
+=head2 C<comb( )>
+
+=head2 C<width( )>
+
+=head2 C<style( )>
+
+=head2 C<link( )>
+
+Accessors.
+
+=head2 C<set_style( $style )>
+
+=head2 C<set_link( $link )>
+
+Setters. Return C<$self>.
+
+=head2 C<string( )>
+
+Returns the cell as a string (chr of rune + combining chars).
+
+=head2 C<append( @runes )>
+
+Appends codepoints. The first goes into C<rune> (if empty), rest into C<comb>.
+
+=head2 C<empty( )>
+
+Returns true if width, rune are 0 and comb is empty.
+
+=head2 C<clear( )>
+
+Returns true if this cell represents a blank (space, width 1, no style/link).
+
+=head2 C<reset( )>
+
+Resets all fields to defaults.
+
+=head2 C<blank( )>
+
+Sets the cell to a blank space (rune = ord(' '), width = 1).
+
+=head2 C<equal( $other )>
+
+Deep equality comparison.
+
+=head2 C<clone( )>
+
+Returns a deep copy (clones style and link if present).
+
+=head1 SEE ALSO
+
+L<Cancer::CellBuf::Line>, L<Cancer::CellBuf::Style>
+
+=head1 LICENSE
+
+This software is Copyright (c) 2026 by Sanko Robinson.
+
+This is free software, licensed under:
+
+  The Artistic License 2.0 (GPL Compatible)
+
+See the F<LICENSE> file for full text.
+
+=head1 AUTHOR
+
+Sanko Robinson  L<https://github.com/sanko>
+
+=begin stopwords
+
+
+=end stopwords
+
+=cut

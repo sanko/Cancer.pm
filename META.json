@@ -85,6 +85,60 @@
       "Cancer::Bubbles" : {
          "file" : "lib/Cancer.pm"
       },
+      "Cancer::CellBuf" : {
+         "file" : "lib/Cancer/CellBuf.pm",
+         "version" : "v0.0.1"
+      },
+      "Cancer::CellBuf::Buffer" : {
+         "file" : "lib/Cancer/CellBuf/Buffer.pm",
+         "version" : "v0.0.1"
+      },
+      "Cancer::CellBuf::Cell" : {
+         "file" : "lib/Cancer/CellBuf/Cell.pm",
+         "version" : "v0.0.1"
+      },
+      "Cancer::CellBuf::Geom" : {
+         "file" : "lib/Cancer/CellBuf/Geom.pm",
+         "version" : "v0.0.1"
+      },
+      "Cancer::CellBuf::Line" : {
+         "file" : "lib/Cancer/CellBuf/Line.pm",
+         "version" : "v0.0.1"
+      },
+      "Cancer::CellBuf::Link" : {
+         "file" : "lib/Cancer/CellBuf/Link.pm",
+         "version" : "v0.0.1"
+      },
+      "Cancer::CellBuf::Pen" : {
+         "file" : "lib/Cancer/CellBuf/Pen.pm",
+         "version" : "v0.0.1"
+      },
+      "Cancer::CellBuf::Position" : {
+         "file" : "lib/Cancer/CellBuf/Geom.pm"
+      },
+      "Cancer::CellBuf::Rectangle" : {
+         "file" : "lib/Cancer/CellBuf/Geom.pm"
+      },
+      "Cancer::CellBuf::Screen" : {
+         "file" : "lib/Cancer/CellBuf/Screen.pm",
+         "version" : "v0.0.1"
+      },
+      "Cancer::CellBuf::Style" : {
+         "file" : "lib/Cancer/CellBuf/Style.pm",
+         "version" : "v0.0.1"
+      },
+      "Cancer::CellBuf::TabStops" : {
+         "file" : "lib/Cancer/CellBuf/TabStops.pm",
+         "version" : "v0.0.1"
+      },
+      "Cancer::CellBuf::Wrap" : {
+         "file" : "lib/Cancer/CellBuf/Wrap.pm",
+         "version" : "v0.0.1"
+      },
+      "Cancer::CellBuf::Writer" : {
+         "file" : "lib/Cancer/CellBuf/Writer.pm",
+         "version" : "v0.0.1"
+      },
       "Cancer::Lipgloss" : {
          "file" : "lib/Cancer.pm"
       },
