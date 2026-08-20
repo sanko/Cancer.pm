@@ -30,7 +30,8 @@
       },
       "runtime" : {
          "recommends" : {
-            "Term::ReadKey" : "0"
+            "Term::ReadKey" : "0",
+            "Win32::API" : "0"
          },
          "requires" : {
             "Acme::Parataxis" : "0",

@@ -29,7 +29,9 @@ The module dispatches to the correct platform backend at compile time:
 
 =over
 
-=item * L<Cancer::Term::Windows> on C<MSWin32> (using C<Win32::Console> or C<Win32::API>)
+=item *
+
+L<Cancer::Term::Windows> on C<MSWin32> (using L<Affix> or L<Win32::API> for kernel32/msvcrt calls)
 
 =item * L<Cancer::Term::Unix> on everything else (using C<ioctl> and raw termios structs)
 
@@ -117,13 +119,31 @@ Returns C<undef> on failure.
 
     my $pass = read_password( fileno(STDIN) );
 
+=head2 C<can_use_term()>
+
+Returns true if the terminal backend loaded successfully and the terminal functions are available. On Unix this always
+returns true; on Windows it returns true if either L<Affix> (preferred) or L<Win32::API> is available and the Win32 API
+imports succeeded.
+
+Use this to check whether terminal operations are supported before calling other functions:
+
+    use Cancer::Term qw[can_use_term is_terminal];
+
+    if ( can_use_term() ) {
+        print "terminal ops available\n";
+    }
+
 =head1 PLATFORM NOTES
 
 =head2 Windows
 
-On Windows, the module uses L<Win32::API> to call kernel32 functions (C<GetConsoleMode>, C<SetConsoleMode>,
-C<GetConsoleScreenBufferInfo>) and msvcrt's C<_get_osfhandle> to convert Perl file descriptors to Windows console
-handles. No external XS modules are required.
+On Windows, the module uses L<Affix> (preferred, a core dependency) or L<Win32::API> (optional) to call kernel32
+functions (C<GetConsoleMode>, C<SetConsoleMode>, C<GetConsoleScreenBufferInfo>) and msvcrt's C<_get_osfhandle> to
+convert Perl file descriptors to Windows console handles.
+
+If L<Win32::API> is not installed, the module compiles and loads but all terminal functions return failure values
+(C<undef> for readers, C<0> for boolean checks, empty list for C<get_size>). Use L<can_use_term()> to test for
+availability.
 
 Raw mode on Windows disables C<ENABLE_ECHO_INPUT>, C<ENABLE_PROCESSED_INPUT>, and C<ENABLE_LINE_INPUT>, and enables
 C<ENABLE_VIRTUAL_TERMINAL_INPUT> for ANSI escape sequence processing.

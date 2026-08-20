@@ -16,15 +16,37 @@ Cancer::Term::Windows - Windows terminal backend for Cancer::Term
 =head1 DESCRIPTION
 
 B<Cancer::Term::Windows> implements the terminal manipulation backend for Windows. It interacts with the Windows
-console via L<Win32::API> calls to C<kernel32.dll> (C<GetConsoleMode>, C<SetConsoleMode>,
-C<GetConsoleScreenBufferInfo>) and C<msvcrt.dll> (C<_get_osfhandle>).
+console via L<Affix> (preferred) or L<Win32::API> (fallback) to call C<kernel32.dll> (C<GetConsoleMode>,
+C<SetConsoleMode>, C<GetConsoleScreenBufferInfo>) and C<msvcrt.dll> (C<_get_osfhandle>).
 
 This module is loaded automatically by L<Cancer::Term> when C<$^O> is C<MSWin32>. You should not need to use it
 directly.
 
+=head2 FFI Backend
+
+The module tries two FFI backends at compile time in order:
+
+=over 4
+
+=item 1. L<Affix> (preferred)
+
+The primary backend. Uses C<affix()> to bind DLL functions directly. With Affix, output pointer parameters (like C<int
+*mode> in C<GetConsoleMode>) are passed as scalar references (C<\$mode>), and the callee writes through the pointer
+with no C<pack>/C<unpack> required.
+
+=item 2. L<Win32::API> (fallback)
+
+Used when L<Affix> is not available. Functions are imported via C<Win32::API-E<gt>Import()> and output parameters
+require manual C<pack>/C<unpack>.
+
+=back
+
+If neither backend is available, the module still compiles but all methods return failure values (C<undef>, C<0>, or
+empty list). Use L<Cancer::Term/can_use_term> to test for availability.
+
 =head2 Win32 API Functions
 
-The module imports the following Win32 API functions at compile time via L<Win32::API>:
+The module binds the following Win32 API functions at compile time:
 
 =over
 

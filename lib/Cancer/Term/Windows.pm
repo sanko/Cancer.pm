@@ -14,12 +14,39 @@ package Cancer::Term::Windows v0.0.1 {
         _ENABLE_VIRTUAL_TERMINAL_INPUT => 0x0200
     };
 
-    # Import Win32 API functions via Win32::API
-    require Win32::API;
-    Win32::API->Import( 'msvcrt',   'long _get_osfhandle(int fd)' )                       or croak 'Cannot import _get_osfhandle';
-    Win32::API->Import( 'kernel32', 'int GetConsoleMode(int h, int *mode)' )              or croak 'Cannot import GetConsoleMode';
-    Win32::API->Import( 'kernel32', 'int SetConsoleMode(int h, int mode)' )               or croak 'Cannot import SetConsoleMode';
-    Win32::API->Import( 'kernel32', 'int GetConsoleScreenBufferInfo(int h, void *info)' ) or croak 'Cannot import GetConsoleScreenBufferInfo';
+    # Bind Win32 API functions.  Try Affix first (it's a core dependency),
+    # fall back to Win32::API (optional), then degrade gracefully.
+    use Affix qw[:all];
+    my ( $HAS_API, $api_backend );
+    {
+        my $ok = eval {
+            affix 'msvcrt',   '_get_osfhandle',             [Int] => Long;
+            affix 'kernel32', 'GetConsoleMode',             [ Long, Pointer [Int] ]  => Int;
+            affix 'kernel32', 'SetConsoleMode',             [ Long, Int ]            => Int;
+            affix 'kernel32', 'GetConsoleScreenBufferInfo', [ Long, Pointer [Void] ] => Int;
+            1;
+        };
+        if ($ok) {
+            $HAS_API     = 1;
+            $api_backend = 'Affix';
+        }
+        else {
+            $ok = eval {
+                require Win32::API;
+                Win32::API->Import( 'msvcrt', 'long _get_osfhandle(int fd)' ) and
+                    Win32::API->Import( 'kernel32', 'int GetConsoleMode(int h, int *mode)' ) and
+                    Win32::API->Import( 'kernel32', 'int SetConsoleMode(int h, int mode)' )  and
+                    Win32::API->Import( 'kernel32', 'int GetConsoleScreenBufferInfo(int h, void *info)' );
+            };
+            if ($ok) {
+                $HAS_API     = 1;
+                $api_backend = 'Win32::API';
+            }
+            else {
+                $HAS_API = 0;
+            }
+        }
+    }
 
     # --- Helpers ---------------------------------------------------------------
     sub _handle ($fd) {
@@ -29,8 +56,14 @@ package Cancer::Term::Windows v0.0.1 {
     }
 
     sub _get_console_mode ($handle) {
-        my $mode = pack( 'L', 0 );
-        return GetConsoleMode( $handle, $mode ) ? unpack( 'L', $mode ) : undef;
+        if ( $api_backend eq 'Affix' ) {
+            my $mode = 0;
+            return GetConsoleMode( $handle, \$mode ) ? $mode : undef;
+        }
+        else {
+            my $mode = pack( 'L', 0 );
+            return GetConsoleMode( $handle, $mode ) ? unpack( 'L', $mode ) : undef;
+        }
     }
 
     sub _set_console_mode ( $handle, $mode ) {
@@ -39,23 +72,27 @@ package Cancer::Term::Windows v0.0.1 {
 
     # --- Public API -----------------------------------------------------------
     sub is_terminal ( $class, $fd ) {
+        return 0 unless $HAS_API;
         my $h = _handle($fd) // return 0;
         return defined _get_console_mode($h) ? 1 : 0;
     }
 
     sub get_state ( $class, $fd ) {
+        return undef unless $HAS_API;
         my $h    = _handle($fd) // return undef;
         my $mode = _get_console_mode($h);
         return defined $mode ? Cancer::Term::State->new( fd => $fd, data => $mode ) : undef;
     }
 
     sub set_state ( $class, $fd, $state ) {
+        return 0 unless $HAS_API;
         return 0 if !defined $state;
         my $h = _handle($fd) // return 0;
         return _set_console_mode( $h, $state->data );
     }
 
     sub make_raw ( $class, $fd ) {
+        return undef unless $HAS_API;
         my $old = $class->get_state($fd) or return undef;
         my $raw = $old->data & ~( _ENABLE_ECHO_INPUT | _ENABLE_PROCESSED_INPUT | _ENABLE_LINE_INPUT );
         $raw |= _ENABLE_VIRTUAL_TERMINAL_INPUT;
@@ -64,18 +101,25 @@ package Cancer::Term::Windows v0.0.1 {
     }
 
     sub get_size ( $class, $fd ) {
+        return () unless $HAS_API;
         my $h = _handle($fd) // return ();
 
         # CONSOLE_SCREEN_BUFFER_INFO: 22 bytes
         #   COORD dwSize (4) + COORD dwCursorPos (4) + WORD wAttr (2)
         #   + SMALL_RECT srWindow (8) + COORD dwMaxSize (4)
         my $buf = "\0" x 22;
-        return () if !GetConsoleScreenBufferInfo( $h, $buf );
+        if ( $api_backend eq 'Affix' ) {
+            return () if !GetConsoleScreenBufferInfo( $h, \$buf );
+        }
+        else {
+            return () if !GetConsoleScreenBufferInfo( $h, $buf );
+        }
         my @win = unpack( 'vvvv', substr( $buf, 10, 8 ) );
         return ( $win[2] - $win[0] + 1, $win[3] - $win[1] + 1 );
     }
 
     sub read_password ( $class, $fd ) {
+        return undef unless $HAS_API;
         my $old = $class->get_state($fd) or return undef;
         my $new = $old->data & ~( _ENABLE_ECHO_INPUT | _ENABLE_LINE_INPUT );
         $new |= ( _ENABLE_PROCESSED_OUTPUT | _ENABLE_PROCESSED_INPUT );

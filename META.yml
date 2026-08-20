@@ -75,6 +75,7 @@ provides:
     version: v0.0.1
 recommends:
   Term::ReadKey: '0'
+  Win32::API: '0'
 requires:
   Acme::Parataxis: '0'
   Affix: '0'
