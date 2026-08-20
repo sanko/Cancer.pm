@@ -1,0 +1,84 @@
+=head1 NAME
+
+Cancer::Term::State - Saved terminal state
+
+=head1 SYNOPSIS
+
+    my $state = Cancer::Term::State->new( fd => 0, data => $raw_termios );
+
+    my $fd   = $state->fd;      # file descriptor number
+    my $data = $state->data;    # raw platform-specific state data
+
+=head1 DESCRIPTION
+
+B<Cancer::Term::State> is a lightweight value object that captures the state of a terminal at a point in time. It is
+returned by L<Cancer::Term/get_state> and L<Cancer::Term/make_raw>, and consumed by L<Cancer::Term/restore> and
+L<Cancer::Term/set_state>.
+
+The class uses Perl's C<experimental 'class'> feature (C<perlclass>) for its field declarations but is otherwise a
+simple data holder with no behaviour beyond its accessors.
+
+=head1 CONSTRUCTOR
+
+=head2 C<new( %args )>
+
+    my $state = Cancer::Term::State->new(
+        fd   => $fd_number,
+        data => $raw_bytes_or_integer
+    );
+
+=over
+
+=item C<fd> (required)
+
+The file descriptor number the state was captured from (an integer, not a filehandle).
+
+=item C<data> (required)
+
+The platform-specific state payload:
+
+=over
+
+=item B<Unix>: a 60-byte (Linux/Solaris) or 44-byte (BSD/macOS) raw termios struct
+
+=item B<Windows>: a 32-bit unsigned integer (the console mode flags)
+
+=back
+
+=back
+
+=head1 METHODS
+
+=head2 C<fd( )>
+
+Returns the file descriptor number (integer) this state was captured from.
+
+=head2 C<data( )>
+
+Returns the raw state data. On Unix this is a packed binary string containing the termios struct. On Windows it is an
+unsigned 32-bit integer representing the console mode.
+
+=head1 SEE ALSO
+
+L<Cancer::Term>, L<Cancer::Term::Unix>, L<Cancer::Term::Windows>
+
+=head1 LICENSE
+
+This software is Copyright (c) 2026 by Sanko Robinson.
+
+This is free software, licensed under:
+
+  The Artistic License 2.0 (GPL Compatible)
+
+See the F<LICENSE> file for full text.
+
+=head1 AUTHOR
+
+Sanko Robinson  L<https://github.com/sanko>
+
+=begin stopwords
+
+
+=end stopwords
+
+=cut

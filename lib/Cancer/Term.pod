@@ -1,0 +1,165 @@
+=head1 NAME
+
+Cancer::Term - Platform-independent interface for interacting with terminal and TTY devices
+
+=head1 SYNOPSIS
+
+    use Cancer::Term qw[is_terminal make_raw get_state set_state restore get_size read_password];
+
+    # Check if STDIN is a terminal
+    if ( is_terminal( fileno(STDIN) ) ) {
+        print "Running interactively\n";
+    }
+
+    # Save state, enter raw mode, restore on exit
+    my $old = make_raw( fileno(STDIN) );
+    my ( $w, $h ) = get_size( fileno(STDOUT) );
+    # ... do TUI stuff ...
+    restore( fileno(STDIN), $old );
+
+    # Read a password without echo
+    my $pass = read_password( fileno(STDIN) );
+
+=head1 DESCRIPTION
+
+B<Cancer::Term> is a function-oriented module that provides a platform-independent interface for interacting with
+terminal and TTY devices. It is a Perl port of Go's C<charmbracelet/x/term> package.
+
+The module dispatches to the correct platform backend at compile time:
+
+=over
+
+=item * L<Cancer::Term::Windows> on C<MSWin32> (using C<Win32::Console> or C<Win32::API>)
+
+=item * L<Cancer::Term::Unix> on everything else (using C<ioctl> and raw termios structs)
+
+=back
+
+All functions operate on a raw file descriptor number (an integer), not a filehandle object. Use C<fileno()> to convert
+a filehandle to a file descriptor number, or L<Cancer::Term::File> to extract file descriptors from file-like objects.
+
+=head1 FUNCTIONS
+
+Nothing is exported by default. Import specific functions or use the C<:all> tag:
+
+    use Cancer::Term qw[:all];
+
+=head2 C<is_terminal( $fd )>
+
+Returns true if the file descriptor C<$fd> is connected to a terminal.
+
+On Unix this probes for a valid termios struct via C<ioctl>; on Windows it checks whether C<GetConsoleMode> succeeds.
+
+    if ( is_terminal( fileno(STDIN) ) ) { ... }
+
+=head2 C<make_raw( $fd )>
+
+Puts the terminal connected to C<$fd> into raw mode and returns a L<Cancer::Term::State> object representing the
+previous terminal state.
+
+Raw mode disables line buffering, echo, and signal processing so that every keystroke is delivered immediately. The
+returned state object should be saved and passed to L<restore( $fd, $old_state )> when raw mode is no longer needed.
+
+On failure (e.g. C<$fd> is not a terminal), returns C<undef>.
+
+    my $old = make_raw( fileno(STDIN) );
+    die "cannot enter raw mode" if !defined $old;
+    # ... raw input ...
+    restore( fileno(STDIN), $old );
+
+=head2 C<get_state( $fd )>
+
+Returns the current state of the terminal connected to C<$fd> as a L<Cancer::Term::State> object. This is useful for
+saving terminal state before a signal handler restores it.
+
+Returns C<undef> on failure.
+
+    my $state = get_state( fileno(STDIN) );
+
+=head2 C<set_state( $fd, $state )>
+
+Sets the terminal connected to C<$fd> to the state captured in C<$state> (a L<Cancer::Term::State> object).
+
+If C<$state> is C<undef>, the terminal mode is reset to defaults (all flags cleared). Returns true on success.
+
+    set_state( fileno(STDIN), $state );
+
+=head2 C<restore( $fd, $old_state )>
+
+Restores the terminal connected to C<$fd> to a previous state. This is a convenience alias for L<set_state( $fd, $state
+)>.
+
+    restore( fileno(STDIN), $old );
+
+=head2 C<get_size( $fd )>
+
+Returns the visible dimensions of the terminal connected to C<$fd> as a list C<( $width, $height )> in list context, or
+as an array reference in scalar context.
+
+These dimensions do not include any scrollback buffer height.
+
+Returns an empty list on failure.
+
+    my ( $width, $height ) = get_size( fileno(STDOUT) );
+    print "Terminal is ${width}x${height}\n";
+
+=head2 C<read_password( $fd )>
+
+Reads a line of input from the terminal connected to C<$fd> without local echo. This is commonly used for inputting
+passwords and other sensitive data.
+
+The returned string does not include the trailing newline. On Windows, C<\r> is treated as the line ending; on Unix,
+C<\n> is.
+
+The terminal state is temporarily modified to disable echo and then restored automatically, even if an error occurs.
+
+Returns C<undef> on failure.
+
+    my $pass = read_password( fileno(STDIN) );
+
+=head1 PLATFORM NOTES
+
+=head2 Windows
+
+On Windows, the module uses L<Win32::API> to call kernel32 functions (C<GetConsoleMode>, C<SetConsoleMode>,
+C<GetConsoleScreenBufferInfo>) and msvcrt's C<_get_osfhandle> to convert Perl file descriptors to Windows console
+handles. No external XS modules are required.
+
+Raw mode on Windows disables C<ENABLE_ECHO_INPUT>, C<ENABLE_PROCESSED_INPUT>, and C<ENABLE_LINE_INPUT>, and enables
+C<ENABLE_VIRTUAL_TERMINAL_INPUT> for ANSI escape sequence processing.
+
+=head2 Unix
+
+On Unix, the module reads and writes the termios struct directly via C<ioctl> calls (C<TCGETS> / C<TCSETS> on Linux;
+C<TIOCGETA> / C<TIOCSETA> on BSD). The termios struct layout is platform-specific and handled via per-OS offset tables.
+
+Raw mode replicates the behavior documented for C<cfmakeraw>: it clears input flags (C<IGNBRK>, C<BRKINT>, C<PARMRK>,
+C<ISTRIP>, C<INLCR>, C<IGNCR>, C<ICRNL>, C<IXON>), output flags (C<OPOST>), local flags (C<ECHO>, C<ECHONL>, C<ICANON>,
+C<ISIG>, C<IEXTEN>), and sets 8-bit no-parity (C<CS8>).
+
+=head1 SEE ALSO
+
+L<Cancer::Term::State>, L<Cancer::Term::File>, L<Cancer::Term::Unix>, L<Cancer::Term::Windows>,
+L<https://github.com/charmbracelet/x/tree/master/term>
+
+=head1 LICENSE
+
+This software is Copyright (c) 2026 by Sanko Robinson.
+
+This is free software, licensed under:
+
+  The Artistic License 2.0 (GPL Compatible)
+
+See the F<LICENSE> file for full text.
+
+=head1 AUTHOR
+
+Sanko Robinson  L<https://github.com/sanko>
+
+=begin stopwords
+
+
+=end stopwords
+
+=cut
+

@@ -1,0 +1,142 @@
+=head1 NAME
+
+Cancer::Term::Unix - Unix/POSIX terminal backend for Cancer::Term
+
+=head1 SYNOPSIS
+
+    # Typically used via Cancer::Term, not directly:
+    use Cancer::Term;
+
+    my $state = Cancer::Term->make_raw( fileno(STDIN) );
+
+    # If you need the backend directly:
+    my $backend = 'Cancer::Term::Unix';
+    my $state   = $backend->make_raw( fileno(STDIN) );
+
+=head1 DESCRIPTION
+
+B<Cancer::Term::Unix> implements the terminal manipulation backend for Unix and POSIX-like systems. It reads and writes
+the C<termios> struct directly via C<ioctl> (or C<syscall> on Linux) and replicates the behaviour of C<cfmakeraw>.
+
+This module is loaded automatically by L<Cancer::Term> when C<$^O> is not C<MSWin32>. You should not need to use it
+directly.
+
+=head2 Termios Struct Layout
+
+The C<termios> struct varies by platform. The module maintains an internal layout table with per-OS offsets and sizes:
+
+    Linux:     60 bytes, cc offset 18
+    Darwin:    44 bytes, cc offset 16
+    FreeBSD:   44 bytes, cc offset 16
+    OpenBSD:   44 bytes, cc offset 16
+    NetBSD:    44 bytes, cc offset 16
+    DragonFly: 44 bytes, cc offset 16
+    Solaris:   60 bytes, cc offset 18
+
+The struct fields are:
+
+    Offset  Size  Field
+    ------  ----  -----
+    0       2     c_iflag   (input flags)
+    2       2     c_oflag   (output flags)
+    4       4     c_cflag   (control flags) -- unpacked as unsigned short on some layouts
+    8       4     c_lflag   (local flags)
+    12/16   1+    c_line    (line discipline)
+    18/16   19    c_cc      (control characters)
+
+=head2 ioctl Numbers
+
+    BSD (darwin, freebsd, openbsd, netbsd, dragonfly):
+        TIOCGETA  = 0x40247413   (read termios)
+        TIOCSETA  = 0x80247414   (write termios)
+        TIOCGWINSZ = 0x40087468  (get window size)
+
+    Linux / Solaris / other:
+        TCGETS    = 0x5401       (read termios)
+        TCSETS    = 0x5402       (write termios)
+        TIOCGWINSZ = 0x5413      (get window size)
+
+=head2 Linux syscall Workaround
+
+On Linux, Perl's C<ioctl()> builtin truncates the SV's string length to the syscall return value. Since C<TCGETS>
+returns 0 on success, this zeroes out the buffer containing the termios struct. To avoid this, the module calls
+C<ioctl> via C<syscall()> directly on Linux, which does not touch the SV. On BSD/macOS, C<ioctl()> returns 1, so the
+standard Perl builtin works correctly.
+
+=head1 METHODS
+
+All methods are called as class methods (e.g. C<Cancer::Term::Unix-E<gt>method(...)>) and are not intended to be called
+from user code -- use L<Cancer::Term> instead.
+
+=head2 C<is_terminal( $class, $fd )>
+
+Returns 1 if C<$fd> is connected to a terminal. Probes by attempting to read the termios struct via C<ioctl>.
+
+=head2 C<get_state( $class, $fd )>
+
+Returns a L<Cancer::Term::State> containing the current terminal settings, or C<undef> on failure.
+
+=head2 C<set_state( $class, $fd, $state )>
+
+Writes the terminal settings from a L<Cancer::Term::State> back to C<$fd>. Returns true on success.
+
+=head2 C<make_raw( $class, $fd )>
+
+Puts the terminal into raw mode (equivalent to C<cfmakeraw>) and returns a L<Cancer::Term::State> with the previous
+settings. Returns C<undef> on failure.
+
+Raw mode performs the following modifications to the termios struct:
+
+=over
+
+=item B<iflag>: clears C<IGNBRK>, C<BRKINT>, C<PARMRK>, C<ISTRIP>, C<INLCR>, C<IGNCR>, C<ICRNL>, C<IXON>
+
+=item B<oflag>: clears C<OPOST>
+
+=item B<lflag>: clears C<ECHO>, C<ECHONL>, C<ICANON>, C<ISIG>, C<IEXTEN>
+
+=item B<cflag>: sets C<CS8>, clears C<CSIZE> and C<PARENB>
+
+=item B<cc[VMIN]>: set to 1 (blocking read, at least 1 byte)
+
+=item B<cc[VTIME]>: set to 0 (no timeout)
+
+=back
+
+=head2 C<get_size( $class, $fd )>
+
+Returns C<( $columns, $rows )> representing the visible dimensions of the terminal. These dimensions do not include
+scrollback buffer height. Returns an empty list on failure.
+
+=head2 C<read_password( $class, $fd )>
+
+Reads a line of input from C<$fd> without local echo. Temporarily disables echo while keeping C<ICANON> and C<ISIG>,
+enables C<ICRNL> (CR to NL mapping), reads until newline, then restores the original terminal state.
+
+Returns the password string (without the trailing newline) or C<undef> on failure.
+
+=head1 SEE ALSO
+
+L<Cancer::Term>, L<Cancer::Term::State>, L<Cancer::Term::Windows>,
+L<https://github.com/charmbracelet/x/tree/master/term>
+
+=head1 LICENSE
+
+This software is Copyright (c) 2026 by Sanko Robinson.
+
+This is free software, licensed under:
+
+  The Artistic License 2.0 (GPL Compatible)
+
+See the F<LICENSE> file for full text.
+
+=head1 AUTHOR
+
+Sanko Robinson  L<https://github.com/sanko>
+
+=begin stopwords
+
+
+=end stopwords
+
+=cut

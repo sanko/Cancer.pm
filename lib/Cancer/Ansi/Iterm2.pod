@@ -59,8 +59,7 @@ Serialises the options of a file hashref into the C<name=...;size=...> option li
 
 =item * C<Size> - The file size in bytes, emitted as C<size=...>.
 
-=item * C<Width> / C<Height> - Optional sizes, emitted as C<width=...> and
-C<height=...>. Pass a value from the size-unit helpers.
+=item * C<Width> / C<Height> - Optional sizes, emitted as C<width=...> and C<height=...>. Pass a value from the size-unit helpers.
 
 =item * C<IgnoreAspectRatio> - Emits C<preserveAspectRatio=0>.
 
@@ -75,7 +74,7 @@ C<height=...>. Pass a value from the size-unit helpers.
 Returns a complete C<File=...> payload for a single image transfer. When the hashref has a C<Content> key, the file
 data is appended after a colon: C<File=opts:content>.
 
-=head2 C<MultipartFile( $f )
+=head2 C<MultipartFile( $f )>
 
 Returns a C<MultipartFile=...> payload that begins a multipart transfer of the given file options. Follow it with one
 or more C<FilePart> calls and close with C<FileEnd>.

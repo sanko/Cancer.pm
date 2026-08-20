@@ -29,6 +29,9 @@
          }
       },
       "runtime" : {
+         "recommends" : {
+            "Term::ReadKey" : "0"
+         },
          "requires" : {
             "Acme::Parataxis" : "0",
             "Affix" : "0"
@@ -83,6 +86,26 @@
       },
       "Cancer::Lipgloss" : {
          "file" : "lib/Cancer.pm"
+      },
+      "Cancer::Term" : {
+         "file" : "lib/Cancer/Term.pm",
+         "version" : "v0.0.1"
+      },
+      "Cancer::Term::File" : {
+         "file" : "lib/Cancer/Term/File.pm",
+         "version" : "v0.0.1"
+      },
+      "Cancer::Term::State" : {
+         "file" : "lib/Cancer/Term/State.pm",
+         "version" : "v0.0.1"
+      },
+      "Cancer::Term::Unix" : {
+         "file" : "lib/Cancer/Term/Unix.pm",
+         "version" : "v0.0.1"
+      },
+      "Cancer::Term::Windows" : {
+         "file" : "lib/Cancer/Term/Windows.pm",
+         "version" : "v0.0.1"
       },
       "Cancer::Util" : {
          "file" : "lib/Cancer/Util.pm",

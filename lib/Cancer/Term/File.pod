@@ -1,0 +1,65 @@
+=head1 NAME
+
+Cancer::Term::File - File descriptor utilities for terminal objects
+
+=head1 SYNOPSIS
+
+    use Cancer::Term::File qw[is_file_like file_fd];
+
+    if ( is_file_like( \*STDOUT ) ) {
+        my $fd = file_fd( \*STDOUT );
+        # $fd is the integer file descriptor
+    }
+
+=head1 DESCRIPTION
+
+B<Cancer::Term::File> provides two small utility functions for extracting file descriptors from Perl file-like objects.
+It is useful when working with L<Cancer::Term>, which operates exclusively on integer file descriptors rather than
+filehandle objects.
+
+Nothing is exported by default. Import specific functions or use the C<:all> tag:
+
+    use Cancer::Term::File qw[:all];
+
+=head1 FUNCTIONS
+
+=head2 C<is_file_like( $thing )>
+
+Returns true if C<$thing> is a file-like object that can yield a valid file descriptor. Checks whether C<$thing> is an
+L<IO::Handle> subclass or responds to C<fileno()> with a non-negative value.
+
+Croaks if C<$thing> is C<undef>.
+
+    if ( is_file_like( \*STDIN ) ) { ... }
+
+=head2 C<file_fd( $thing )>
+
+Returns the file descriptor number for C<$thing> via C<fileno()>. This is a thin wrapper that exists for API
+consistency.
+
+    my $fd = file_fd( $socket );
+
+=head1 SEE ALSO
+
+L<Cancer::Term>
+
+=head1 LICENSE
+
+This software is Copyright (c) 2026 by Sanko Robinson.
+
+This is free software, licensed under:
+
+  The Artistic License 2.0 (GPL Compatible)
+
+See the F<LICENSE> file for full text.
+
+=head1 AUTHOR
+
+Sanko Robinson  L<https://github.com/sanko>
+
+=begin stopwords
+
+
+=end stopwords
+
+=cut

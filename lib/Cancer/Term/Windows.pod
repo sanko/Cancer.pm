@@ -1,0 +1,131 @@
+=head1 NAME
+
+Cancer::Term::Windows - Windows terminal backend for Cancer::Term
+
+=head1 SYNOPSIS
+
+    # Typically used via Cancer::Term, not directly:
+    use Cancer::Term;
+
+    my $state = Cancer::Term->make_raw( fileno(STDIN) );
+
+    # If you need the backend directly:
+    my $backend = 'Cancer::Term::Windows';
+    my $state   = $backend->make_raw( fileno(STDIN) );
+
+=head1 DESCRIPTION
+
+B<Cancer::Term::Windows> implements the terminal manipulation backend for Windows. It interacts with the Windows
+console via L<Win32::API> calls to C<kernel32.dll> (C<GetConsoleMode>, C<SetConsoleMode>,
+C<GetConsoleScreenBufferInfo>) and C<msvcrt.dll> (C<_get_osfhandle>).
+
+This module is loaded automatically by L<Cancer::Term> when C<$^O> is C<MSWin32>. You should not need to use it
+directly.
+
+=head2 Win32 API Functions
+
+The module imports the following Win32 API functions at compile time via L<Win32::API>:
+
+=over
+
+=item C<_get_osfhandle( int fd )> (msvcrt)
+
+Converts a C runtime file descriptor to a Windows console handle. Returns C<-1> on error.
+
+=item C<GetConsoleMode( int h, int *mode )> (kernel32)
+
+Retrieves the current console mode flags for the given handle. Returns the mode as a 32-bit unsigned integer, or
+C<undef> on failure (e.g. if the handle is not a console).
+
+=item C<SetConsoleMode( int h, int mode )> (kernel32)
+
+Sets the console mode flags for the given handle.
+
+=item C<GetConsoleScreenBufferInfo( int h, void *info )> (kernel32)
+
+Retrieves information about the console screen buffer. The C<CONSOLE_SCREEN_BUFFER_INFO> struct is 22 bytes and
+contains cursor position, window size, and screen attributes.
+
+=back
+
+=head2 Console Mode Constants
+
+    ENABLE_ECHO_INPUT              0x0004
+    ENABLE_LINE_INPUT              0x0002
+    ENABLE_PROCESSED_INPUT         0x0001
+    ENABLE_PROCESSED_OUTPUT        0x0001
+    ENABLE_VIRTUAL_TERMINAL_INPUT  0x0200
+
+=head2 Raw Mode on Windows
+
+Raw mode disables C<ENABLE_ECHO_INPUT>, C<ENABLE_PROCESSED_INPUT>, and C<ENABLE_LINE_INPUT>, and enables
+C<ENABLE_VIRTUAL_TERMINAL_INPUT> to allow ANSI escape sequence processing. This differs from Unix raw mode in that the
+Windows console has its own line editing and echo machinery rather than the termios-based approach used on POSIX.
+
+=head2 Window Size
+
+The console window size is extracted from the C<CONSOLE_SCREEN_BUFFER_INFO> struct returned by
+C<GetConsoleScreenBufferInfo>. The struct is unpacked from offset 10 (the C<srWindow> C<SMALL_RECT> field) and the
+width and height are computed as:
+
+    width  = srWindow.Right - srWindow.Left + 1
+    height = srWindow.Bottom - srWindow.Top + 1
+
+=head1 METHODS
+
+All methods are called as class methods (e.g. C<Cancer::Term::Windows-E<gt>method(...)>) and are not intended to be
+called from user code -- use L<Cancer::Term> instead.
+
+=head2 C<is_terminal( $class, $fd )>
+
+Returns 1 if C<$fd> is connected to a Windows console (i.e. C<GetConsoleMode> succeeds on the handle).
+
+=head2 C<get_state( $class, $fd )>
+
+Returns a L<Cancer::Term::State> whose C<data> field holds the current 32-bit console mode, or C<undef> on failure.
+
+=head2 C<set_state( $class, $fd, $state )>
+
+Restores the console mode from a L<Cancer::Term::State>. Returns true on success.
+
+=head2 C<make_raw( $class, $fd )>
+
+Puts the console into raw mode and returns a L<Cancer::Term::State> with the previous mode, or C<undef> on failure.
+
+=head2 C<get_size( $class, $fd )>
+
+Returns C<( $columns, $rows )> representing the visible dimensions of the console window. These dimensions do not
+include scrollback buffer height. Returns an empty list on failure.
+
+=head2 C<read_password( $class, $fd )>
+
+Reads a line of input from C<$fd> without local echo. Temporarily disables C<ENABLE_ECHO_INPUT> and
+C<ENABLE_LINE_INPUT>, enables C<ENABLE_PROCESSED_OUTPUT> and C<ENABLE_PROCESSED_INPUT>, reads until C<\r> (carriage
+return), then restores the original console mode.
+
+Returns the password string (without the trailing newline) or C<undef> on failure.
+
+=head1 SEE ALSO
+
+L<Cancer::Term>, L<Cancer::Term::State>, L<Cancer::Term::Unix>, L<https://github.com/charmbracelet/x/tree/master/term>
+
+=head1 LICENSE
+
+This software is Copyright (c) 2026 by Sanko Robinson.
+
+This is free software, licensed under:
+
+  The Artistic License 2.0 (GPL Compatible)
+
+See the F<LICENSE> file for full text.
+
+=head1 AUTHOR
+
+Sanko Robinson  L<https://github.com/sanko>
+
+=begin stopwords
+
+
+=end stopwords
+
+=cut

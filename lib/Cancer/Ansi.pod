@@ -581,7 +581,7 @@ Alias for C<HorizontalVerticalPosition>. CSI C<n;m> f.
 
 Alias for C<DECSCUSR>. Sets the cursor style. Sends CSI C<Ps> SP C<q>. C<$style> values:
 
-=over 4
+=over
 
 =item 0 - blinking block (default)
 
@@ -666,7 +666,7 @@ Screen manipulation functions based on VT510 / ECMA-48 sequences.
 
 Alias for C<ED>. Erases part or all of the display. Sends CSI C<n> J.
 
-=over 4
+=over
 
 =item 0 - erase below (from cursor to end of display)
 
@@ -686,7 +686,7 @@ Alias for C<EraseDisplay>. CSI C<n> J.
 
 Alias for C<EL>. Erases part or all of the current line. Sends CSI C<n> K.
 
-=over 4
+=over
 
 =item 0 - erase right (from cursor to end of line)
 
@@ -768,7 +768,7 @@ Alias for C<DeleteCharacter>. CSI C<Pn> P.
 
 Alias for C<TBC>. Clears tab stops. Sends CSI C<Pn> g.
 
-=over 4
+=over
 
 =item 0 - clear the tab stop at the current column
 
