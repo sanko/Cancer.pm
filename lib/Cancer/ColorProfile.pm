@@ -39,6 +39,15 @@ package Cancer::ColorProfile v0.0.1 {
         return 'Unknown';
     }
 
+    sub _cache_key ($color) {
+        return '' unless defined $color;
+        my $type = $color->{type} // '';
+        return "${type}:$color->{code}"                      if $type eq 'basic';
+        return "${type}:$color->{index}"                     if $type eq '256';
+        return "${type}:$color->{r}:$color->{g}:$color->{b}" if $type eq 'rgb';
+        return '';
+    }
+
     # Convert a color hashref to one supported by the given profile.
     # Color types: {type=>'basic', code=>0..15}, {type=>'256', index=>0..255},
     #              {type=>'rgb', r=>0..255, g=>0..255, b=>0..256}
@@ -46,17 +55,15 @@ package Cancer::ColorProfile v0.0.1 {
     sub Convert ( $profile, $color ) {
         return undef  if $profile <= ASCII;
         return $color if $profile == TrueColor;    # passthrough
+        my $key = _cache_key($color);
 
         # Check cache
-        if ( defined $color && exists $CACHE{$profile} && exists $CACHE{$profile}{$color} ) {
-            return $CACHE{$profile}{$color};
-        }
+        return $CACHE{$profile}{$key} if $key ne '' && exists $CACHE{$profile} && exists $CACHE{$profile}{$key};
+        #
         my $converted = _do_convert( $profile, $color );
 
         # Cache the result
-        if ( defined $converted && $profile != TrueColor ) {
-            $CACHE{$profile}{$color} = $converted;
-        }
+        $CACHE{$profile}{$key} = $converted if defined $converted && $key ne '' && $profile != TrueColor;
         return $converted;
     }
 
