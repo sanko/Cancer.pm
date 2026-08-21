@@ -91,7 +91,7 @@ sub encode_graphics ( $buf_ref, $pixels, $width, $height, $opts //= {} ) {
         $data = $file;
     }
     elsif ( $transmission eq TempFile ) {
-        my ( $fh, $tempfile ) = tempfile( 'tty-graphics-protocol-XXXXXX', UNLINK => 0 );
+        my ( $fh, $tempfile ) = tempfile( 'tty-graphics-protocol-XXXXXX', UNLINK => 1 );
         binmode($fh);
         my $encoded = $encoder->encode( $pixels, $width, $height );
         print $fh $encoded;
