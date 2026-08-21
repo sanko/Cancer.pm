@@ -2,7 +2,7 @@ use v5.42;
 
 package Cancer::CellBuf::Wrap v0.0.1 {
     use Exporter qw[import];
-    our @EXPORT_OK = qw[wrap_text];
+    our @EXPORT_OK = qw[wrap_text _read_style _read_link];
     use Cancer::Ansi::Parser qw[
         new_parser parser_reset DecodeSequence HasCsiPrefix HasOscPrefix
         param command params data MissingParam ParamVal HasMore

@@ -9,7 +9,7 @@ Cancer::ColorProfile - Detect and adapt to terminal color capabilities
     use Cancer::ColorProfile;
 
     my $profile = Detect(\*STDOUT);
-    say "Terminal supports: ", Profile_String($profile);
+    say 'Terminal supports: ' . Profile_String($profile);
 
     # Convert a truecolor RGB to the detected profile
     my $rgb = { type => 'rgb', r => 107, g => 80, b => 255 };

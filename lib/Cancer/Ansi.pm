@@ -171,6 +171,7 @@ package Cancer::Ansi v0.0.1 {
                 RequestLightDarkReport
                 SelectCharacterSet SCS
                 LS1R LS2 LS2R LS3 LS3R
+                x_parse_color
                 ]
         ]
     );
@@ -185,6 +186,38 @@ package Cancer::Ansi v0.0.1 {
     sub reset_foreground_color ()   {"\e]110\a"}
     sub reset_background_color ()   {"\e]111\a"}
     sub reset_cursor_color ()       {"\e]112\a"}
+
+    # XParseColor parses X11 rgb:/rgba: color strings and hex (#RGB, #RRGGBB).
+    # Returns undef on invalid input.
+    sub x_parse_color ($s) {
+        if ( $s =~ /^#/ ) {
+            my $hex = $s;
+            $hex =~ s/^#//;
+            my $len = length($hex);
+            if ( $len == 3 ) {
+                my @h = split //, $hex;
+                return [ ( map { hex("$_$_") } @h ), 255 ];
+            }
+            elsif ( $len == 6 ) {
+                my @h = unpack( "A2A2A2", $hex );
+                return [ ( map { hex($_) } @h ), 255 ];
+            }
+            return undef;
+        }
+        elsif ( $s =~ /^rgb:/ ) {
+            my @parts = split m{/}, substr( $s, 4 );
+            return undef unless @parts == 3;
+            my @rgb = map { my $v = hex($_); $v > 255 ? $v >> 8 : $v } @parts;
+            return [ @rgb, 255 ];
+        }
+        elsif ( $s =~ /^rgba:/ ) {
+            my @parts = split m{/}, substr( $s, 5 );
+            return undef unless @parts == 4;
+            my @rgba = map { my $v = hex($_); $v > 255 ? $v >> 8 : $v } @parts;
+            return \@rgba;
+        }
+        return undef;
+    }
 
     # Clipboard
     use constant { SYSTEM_CLIPBOARD => 'c', PRIMARY_CLIPBOARD => 'p' };
