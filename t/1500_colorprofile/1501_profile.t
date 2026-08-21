@@ -116,5 +116,41 @@ subtest 'env_no_color, cli_color, cli_color_forced' => sub {
     is Cancer::ColorProfile::cli_color_forced( { CLICOLOR_FORCE => '1' } ), T(), 'CLICOLOR_FORCE=1';
     is Cancer::ColorProfile::cli_color_forced( {} ),                        F(), 'empty is not cli_color_forced';
 };
+subtest 'force_color helper' => sub {
+
+    # https://force-color.org/ — present and non-empty => forced
+    is Cancer::ColorProfile::force_color( { FORCE_COLOR => '1' } ),    T(), 'FORCE_COLOR=1 is forced';
+    is Cancer::ColorProfile::force_color( { FORCE_COLOR => '0' } ),    T(), 'FORCE_COLOR=0 is forced (regardless of value)';
+    is Cancer::ColorProfile::force_color( { FORCE_COLOR => 'true' } ), T(), 'FORCE_COLOR=true is forced';
+    is Cancer::ColorProfile::force_color( { FORCE_COLOR => '' } ),     F(), 'FORCE_COLOR="" (empty) is not forced';
+    is Cancer::ColorProfile::force_color( {} ), F(), 'FORCE_COLOR not set is not forced';
+};
+subtest 'FORCE_COLOR in Env detection' => sub {
+
+    # FORCE_COLOR forces at least ANSI even without a TERM
+    is Cancer::ColorProfile::Env( { FORCE_COLOR => '1' } ), ( $^O eq 'MSWin32' ? TrueColor : ANSI ),
+        'FORCE_COLOR=1 with no TERM forces color (platform-aware)';
+
+    # FORCE_COLOR with dumb TERM still forces color (overrides dumb)
+    is Cancer::ColorProfile::Env( { TERM => 'dumb', FORCE_COLOR => '1' } ), ( $^O eq 'MSWin32' ? TrueColor : ANSI ),
+        'FORCE_COLOR=1 overrides TERM=dumb (platform-aware)';
+
+    # FORCE_COLOR with xterm-256color keeps the higher profile
+    is Cancer::ColorProfile::Env( { TERM => 'xterm-256color', FORCE_COLOR => '1' } ), ANSI256, 'FORCE_COLOR=1 with xterm-256color => ANSI256';
+
+    # FORCE_COLOR with COLORTERM=truecolor keeps TrueColor
+    is Cancer::ColorProfile::Env( { TERM => 'xterm', COLORTERM => 'truecolor', FORCE_COLOR => '1' } ), TrueColor,
+        'FORCE_COLOR=1 with COLORTERM=truecolor => TrueColor';
+
+    # FORCE_COLOR=0 still forces (regardless of value per spec)
+    is Cancer::ColorProfile::Env( { TERM => 'dumb', FORCE_COLOR => '0' } ), ( $^O eq 'MSWin32' ? TrueColor : ANSI ),
+        'FORCE_COLOR=0 overrides TERM=dumb (platform-aware)';
+
+    # FORCE_COLOR overrides NO_COLOR
+    is Cancer::ColorProfile::Env( { TERM => 'xterm-256color', NO_COLOR => '1', FORCE_COLOR => '1' } ), ANSI256, 'FORCE_COLOR=1 overrides NO_COLOR=1';
+
+    # Without FORCE_COLOR, NO_COLOR still works
+    is Cancer::ColorProfile::Env( { TERM => 'xterm-256color', NO_COLOR => '1' } ), ASCII, 'NO_COLOR=1 without FORCE_COLOR still works';
+};
 #
 done_testing;

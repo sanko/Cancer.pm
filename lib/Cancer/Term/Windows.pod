@@ -96,7 +96,7 @@ width and height are computed as:
 =head1 METHODS
 
 All methods are called as class methods (e.g. C<Cancer::Term::Windows-E<gt>method(...)>) and are not intended to be
-called from user code -- use L<Cancer::Term> instead.
+called from user code. Use L<Cancer::Term> instead.
 
 =head2 C<is_terminal( $class, $fd )>
 

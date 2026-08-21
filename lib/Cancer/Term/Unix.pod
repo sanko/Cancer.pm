@@ -66,7 +66,7 @@ standard Perl builtin works correctly.
 =head1 METHODS
 
 All methods are called as class methods (e.g. C<Cancer::Term::Unix-E<gt>method(...)>) and are not intended to be called
-from user code -- use L<Cancer::Term> instead.
+from user code. Use L<Cancer::Term> instead.
 
 =head2 C<is_terminal( $class, $fd )>
 

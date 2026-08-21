@@ -68,11 +68,27 @@ C<"NoTTY">, or C<"Unknown">.
 Detect color profile from the terminfo database for the given terminal name. Requires L<Term::Terminfo> to be
 installed.
 
+=head2 C<force_color( $environ )>
+
+Returns true if the C<FORCE_COLOR> environment variable is set and non-empty. Per the force-color.org spec, the
+variable forces ANSI color regardless of its value (C<FORCE_COLOR=0> still forces color).
+
+C<$environ> is a hashref of environment variables.
+
+    if ( force_color(\%ENV) ) {
+        # Color is forced on
+    }
+
 =head1 ENVIRONMENT VARIABLES
 
 The following environment variables affect detection:
 
 =over
+
+=item C<FORCE_COLOR>
+
+If set and non-empty, forces ANSI color output regardless of C<NO_COLOR> or TTY status. Overrides dumb terminals and
+non-TTY detection. This follows the L<https://force-color.org/> standard.
 
 =item C<NO_COLOR>
 
@@ -119,6 +135,16 @@ If C<ON>, indicates ConEmu with truecolor support.
 If set on Windows, indicates ANSICON support.
 
 =back
+
+=head1 SEE ALSO
+
+L<https://force-color.org/> - FORCE_COLOR standard for forcing color output.
+
+L<https://no-color.org/> - NO_COLOR standard for disabling color output.
+
+L<https://bixense.com/clicolors/> - CLICOLOR/CLICOLOR_FORCE standard.
+
+L<https://github.com/charmbracelet/colorprofile> - Go library this module ports.
 
 =head1 LICENSE
 

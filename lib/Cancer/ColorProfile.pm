@@ -10,6 +10,7 @@ package Cancer::ColorProfile v0.0.1 {
                 = qw[
                 Unknown NoTTY ASCII ANSI ANSI256 TrueColor
                 Detect Env Profile_String Convert
+                force_color
                 ]
         ]
     );
@@ -130,7 +131,7 @@ package Cancer::ColorProfile v0.0.1 {
     # Detect profile from a writer/filehandle and environment.
     # In Perl, we use %ENV directly (unlike Go which passes []string).
     sub Detect ( $output, $environ = \%ENV ) {
-        my $isatty  = is_tty_forced($environ) || _is_tty($output);
+        my $isatty  = is_tty_forced($environ) || force_color($environ) || _is_tty($output);
         my $term    = $environ->{TERM} // '';
         my $is_dumb = ( $term eq '' || $term eq 'dumb' );
         my $envp    = _color_profile( $isatty, $environ );
@@ -152,6 +153,14 @@ package Cancer::ColorProfile v0.0.1 {
         my $term    = $environ->{TERM} // '';
         my $is_dumb = ( ( !defined $environ->{TERM} && $^O ne 'MSWin32' ) || $term eq 'dumb' );
         my $envp    = _env_color_profile($environ);
+
+        # https://force-color.org/ - FORCE_COLOR overrides dumb and non-TTY
+        if ( force_color($environ) ) {
+            my $p = $envp;
+            $p = ANSI  if $p < ANSI;
+            $p = $envp if $envp > $p;
+            return $p;
+        }
         return NoTTY if !$isatty || $is_dumb;
         my $p = $envp;
         if ( env_no_color($environ) ) {
@@ -289,6 +298,15 @@ package Cancer::ColorProfile v0.0.1 {
 
     sub is_tty_forced ($environ) {
         return _parse_bool( $environ->{TTY_FORCE} // '' );
+    }
+
+    # https://force-color.org/
+    # When FORCE_COLOR is present and non-empty, force ANSI color regardless of NO_COLOR or TTY state.
+    # Unlike _parse_bool, FORCE_COLOR=0 still counts as forced.
+    sub force_color ($environ) {
+        return 0 if !exists $environ->{FORCE_COLOR};
+        return 0 if $environ->{FORCE_COLOR} eq '';
+        return 1;
     }
 
     sub _parse_bool ($v) {

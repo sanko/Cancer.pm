@@ -68,7 +68,7 @@ sub encode_graphics ( $buf_ref, $pixels, $width, $height, $opts //= {} ) {
     my $data     = '';
     my $compress = defined $opts->{compression} && $opts->{compression} eq Zlib ? 1 : 0;
     my $format   = $opts->{format} // RGBA;
-    my $encoder  = Cancer::Ansi::Kitty::Encoder->new( compress => $compress, format => $format, );
+    my $encoder  = Cancer::Ansi::Kitty::Encoder->new( compress => $compress, format => $format );
     if ( $transmission eq Direct ) {
         eval { $data = $encoder->encode( $pixels, $width, $height ); };
         if ($@) {

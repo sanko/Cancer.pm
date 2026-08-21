@@ -72,6 +72,16 @@ Returns the current color profile constant.
 
 Returns the forward filehandle.
 
+=head1 SEE ALSO
+
+L<Cancer::ColorProfile> - Detect and adapt to terminal color capabilities.
+
+L<https://force-color.org/> - FORCE_COLOR standard.
+
+L<https://no-color.org/> - NO_COLOR standard.
+
+L<https://github.com/charmbracelet/colorprofile> - Go library this module ports.
+
 =head1 LICENSE
 
 This software is Copyright (c) 2026 by Sanko Robinson.
