@@ -31,10 +31,7 @@ placement and overwriting.
 
 Creates a new Line from an array of Cell objects (or C<undef>).
 
-=head2 C<width( )>
-
-
-=head2 C<len( )>
+=head2 C<width( )>, C<len( )>
 
 Returns the number of cell positions in the line.
 

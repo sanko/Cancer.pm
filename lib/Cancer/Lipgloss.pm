@@ -570,6 +570,7 @@ package Cancer::Lipgloss v0.0.1 {
         sub _normalize_color {
             my ($c) = @_;
             return $c if !defined $c || !ref $c;
+            return $c if blessed($c) && $c->isa('Cancer::Lipgloss::NoColor');
             return $c if blessed($c) && $c->isa('Cancer::Lipgloss::RGBColor');
             return $c if blessed($c) && $c->isa('Cancer::Lipgloss::BasicColor');
             return $c if blessed($c) && $c->isa('Cancer::Lipgloss::IndexedColor');
@@ -1697,27 +1698,27 @@ package Cancer::Lipgloss v0.0.1 {
 
     sub OuterHalfBlockBorder () {
         _make_border(
-            top           => '▀',
-            bottom        => '▄',
-            left          => '▌',
-            right         => '▐',
-            top_left      => '▛',
-            top_right     => '▜',
-            bottom_left   => '▙',
-            bottom_right  => '▟'
+            top          => '▀',
+            bottom       => '▄',
+            left         => '▌',
+            right        => '▐',
+            top_left     => '▛',
+            top_right    => '▜',
+            bottom_left  => '▙',
+            bottom_right => '▟'
         );
     }
 
     sub InnerHalfBlockBorder () {
         _make_border(
-            top           => '▄',
-            bottom        => '▀',
-            left          => '▐',
-            right         => '▌',
-            top_left      => '▗',
-            top_right     => '▖',
-            bottom_left   => '▝',
-            bottom_right  => '▘'
+            top          => '▄',
+            bottom       => '▀',
+            left         => '▐',
+            right        => '▌',
+            top_left     => '▗',
+            top_right    => '▖',
+            bottom_left  => '▝',
+            bottom_right => '▘'
         );
     }
 

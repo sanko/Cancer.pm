@@ -1,0 +1,93 @@
+=encoding utf8
+
+=head1 NAME
+
+Cancer::Lipgloss::Canvas - A cell grid for composited output
+
+=head1 SYNOPSIS
+
+    use Cancer::Lipgloss qw[NewCanvas NewLayer NewCompositor];
+
+    my $canvas = NewCanvas( width => 40, height => 10 );
+    my $comp   = NewCompositor( NewLayer("hello") );
+    $canvas->compose($comp);
+    print scalar $canvas->render;
+
+=head1 DESCRIPTION
+
+A Canvas is a width by height grid of L<Cancer::CellBuf::Cell> objects that drawables can paint onto. It is the
+rendering surface used by L<Cancer::Lipgloss::Compositor>: layers draw their content into the canvas, and C<render>
+turns the result into a styled string, one line per row.
+
+=head1 METHODS
+
+=head2 C<new( %args )>
+
+Creates a canvas. Accepts C<width> and C<height> (default 0). Use C<NewCanvas( %args )> exported from
+L<Cancer::Lipgloss> as a shorthand.
+
+=head2 C<width( )>, C<height( )>
+
+Returns the canvas dimensions.
+
+=head2 C<bounds( )>
+
+Returns a L<Cancer::CellBuf::Geom> rect covering the whole canvas.
+
+=head2 C<resize( $width, $height )>
+
+Resizes the canvas and its underlying buffer.
+
+=head2 C<clear( )>
+
+Empties every cell.
+
+=head2 C<cell_at( $x, $y )>
+
+Returns the cell at the given coordinates, or undef if empty.
+
+=head2 C<set_cell( $x, $y, $cell )>
+
+Places a cell at the given coordinates.
+
+=head2 C<cell_width( $x, $y )>, C<cell_height( )>
+
+Cell metrics; widths come from the cell itself, heights are always 1.
+
+=head2 C<compose( $drawable )>
+
+Asks C<$drawable> to draw itself onto this canvas over the full bounds. Drawables need a C<draw( $screen, $area )>
+method.
+
+=head2 C<draw( $target, $area )>
+
+Copies every defined cell of this canvas into C<$target>, offset by the area's minimum point.
+
+=head2 C<render( )>
+
+Renders each row with L<Cancer::CellBuf::Writer>'s line renderer and joins them with newlines.
+
+=head1 SEE ALSO
+
+L<Cancer::Lipgloss::Compositor>, L<Cancer::Lipgloss::Layer>, L<Cancer::CellBuf::Writer>
+
+=head1 LICENSE
+
+This software is Copyright (c) 2026 by Sanko Robinson.
+
+This is free software, licensed under:
+
+  The Artistic License 2.0 (GPL Compatible)
+
+See the F<LICENSE> file for full text.
+
+=head1 AUTHOR
+
+Sanko Robinson  L<https://github.com/sanko>
+
+=begin stopwords
+
+
+=end stopwords
+
+=cut

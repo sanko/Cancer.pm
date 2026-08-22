@@ -1,0 +1,53 @@
+=encoding utf8
+
+=head1 NAME
+
+Cancer::CharmTone - The CharmTone color palette
+
+=head1 SYNOPSIS
+
+    use Cancer::CharmTone qw[Pickle Flamingo];
+    use Cancer::Lipgloss qw[NewStyle];
+
+    my $style = NewStyle->foreground( Pickle() )->background( Flamingo() );
+
+=head1 DESCRIPTION
+
+Named constants for the CharmTone palette, a hand picked set of 73 colors designed for terminal interfaces. Each
+function returns a L<Cancer::Lipgloss> color object suitable for use with C<foreground>, C<background>, and friends.
+
+The full list of exported names:
+
+Cumin Tang Yam Paprika Bengal Uni Sriracha Coral Salmon Chili Cherry Tuna Macaron Pony Cheeky Flamingo Dolly Blush
+Urchin Mochi Lilac Prince Violet Mauve Grape Plum Orchid Jelly Charple Hazy Ox Sapphire Guppy Oceania Thunder Anchovy
+Damson Malibu Sardine Zinc Turtle Lichen Guac Julep Bok Mustard Citron Zest Butter Pepper BBQ Char Iron Oyster Squid
+Steam Smoke Steep Sash Salt Soda Darple Larple Pickle Gator Spinach Pom Steak Toast Ice Charcoal
+
+C<Charcoal> is an alias for C<Char>.
+
+All functions are exportable on demand; nothing is exported by default.
+
+=head1 SEE ALSO
+
+L<Cancer::Lipgloss>
+
+=head1 LICENSE
+
+This software is Copyright (c) 2026 by Sanko Robinson.
+
+This is free software, licensed under:
+
+  The Artistic License 2.0 (GPL Compatible)
+
+See the F<LICENSE> file for full text.
+
+=head1 AUTHOR
+
+Sanko Robinson  L<https://github.com/sanko>
+
+=begin stopwords
+
+
+=end stopwords
+
+=cut

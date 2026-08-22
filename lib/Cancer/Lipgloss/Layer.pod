@@ -1,0 +1,100 @@
+=encoding utf8
+
+=head1 NAME
+
+Cancer::Lipgloss::Layer - A positioned, z-ordered chunk of content
+
+=head1 SYNOPSIS
+
+    use Cancer::Lipgloss qw[NewLayer NewCompositor Println];
+
+    my $background = NewLayer($document);
+    my $modal      = NewLayer($panel)->X(58)->Y(44)->set_id('modal');
+    my $comp       = NewCompositor( $background, $modal );
+    Println($comp);
+
+=head1 DESCRIPTION
+
+A Layer wraps a block of text plus a position (C<X>, C<Y>) and stacking order (C<Z>). Layers may nest: child layers are
+positioned relative to their parent, and the parent's bounds grow to contain them.
+
+The compositor flattens a layer tree into an ordered draw list; see L<Cancer::Lipgloss::Compositor>.
+
+=head1 CONSTRUCTORS
+
+=head2 C<NewLayer( $content, @layers )>
+
+Creates a layer from content and optional child layers. Exported from L<Cancer::Lipgloss>.
+
+=head2 C<new( %args )>
+
+Direct constructor accepting C<id>, C<content>, C<x>, C<y>, C<z>, and C<layers>.
+
+=head2 C<NewLayerHit( %args )>
+
+Creates a hit record with C<id>, C<layer>, and C<bounds>. Returned by the compositor's C<hit> method.
+
+=head1 METHODS
+
+=head2 C<set_id( $id )>, C<get_id( )>
+
+Sets or returns the layer's id. Ids let the compositor's C<get_layer> and C<hit> methods find layers by name.
+
+=head2 C<set_x( $v )>, C<set_y( $v )>, C<set_z( $v )>
+
+Position mutators. The aliases C<X>, C<Y>, and C<Z> do the same job and chain with other method calls. Position changes
+require the compositor to refresh before rendering again.
+
+=head2 C<get_x( )>, C<get_y( )>, C<get_z( )>
+
+Position accessors.
+
+=head2 C<width( )>, C<height( )>
+
+Returns the bounds of this layer including all descendants.
+
+=head2 C<layers( )>, C<add_layers( @layers )>
+
+Child layer access; adding layers recomputes bounds.
+
+=head2 C<get_layer( $id )>
+
+Searches this layer and its children for the given id.
+
+=head2 C<max_z( )>
+
+Returns the highest z-index in this subtree.
+
+=head2 C<draw( $screen, $area )>
+
+Writes the layer's content into a screen object supporting C<set_cell>, clipped to C<$area>.
+
+=head2 LAYER HIT RECORD
+
+A L<Cancer::Lipgloss::LayerHit> provides C<empty> (true when nothing was hit), plus C<id>, C<layer>, and C<bounds>
+accessors.
+
+=head1 SEE ALSO
+
+L<Cancer::Lipgloss::Compositor>, L<Cancer::Lipgloss::Canvas>
+
+=head1 LICENSE
+
+This software is Copyright (c) 2026 by Sanko Robinson.
+
+This is free software, licensed under:
+
+  The Artistic License 2.0 (GPL Compatible)
+
+See the F<LICENSE> file for full text.
+
+=head1 AUTHOR
+
+Sanko Robinson  L<https://github.com/sanko>
+
+=begin stopwords
+
+
+=end stopwords
+
+=cut

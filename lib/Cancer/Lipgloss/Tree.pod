@@ -123,4 +123,23 @@ Read-only accessors.
 
 L<Cancer::Lipgloss>, L<Cancer::Lipgloss::List>, L<Cancer::Lipgloss::Table>
 
+=head1 LICENSE
+
+This software is Copyright (c) 2026 by Sanko Robinson.
+
+This is free software, licensed under:
+
+  The Artistic License 2.0 (GPL Compatible)
+
+See the F<LICENSE> file for full text.
+
+=head1 AUTHOR
+
+Sanko Robinson  L<https://github.com/sanko>
+
+=begin stopwords
+
+
+=end stopwords
+
 =cut

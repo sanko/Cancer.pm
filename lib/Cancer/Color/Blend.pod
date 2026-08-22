@@ -1,0 +1,111 @@
+=encoding utf8
+
+=head1 NAME
+
+Cancer::Color::Blend - Color space math and gradient blending
+
+=head1 SYNOPSIS
+
+    use Cancer::Color::Blend qw[blend_1d blend_from_color];
+
+    my @gradient = blend_1d( 10, '#FF0000', '#0000FF' )->@*;
+    my $mid      = blend_from_color('#FF0000')->blend_lab( blend_from_color('#0000FF'), 0.5 );
+
+=head1 DESCRIPTION
+
+A minimal Perl port of the parts of L<go-colorful|https://github.com/lucasb-eyer/go-colorful> that Lipgloss relies on:
+CIELAB interpolation, HSL/HSV conversion, luminance detection, and multi-stop gradient generation. Colors are
+represented as blessed hashrefs with C<R>, C<G>, and C<B> fields in the 0 to 1 range.
+
+All functions are exportable on demand; nothing is exported by default.
+
+=head1 FUNCTIONS
+
+=head2 C<blend_new( $class, $r, $g, $b )>
+
+Creates a color object from 0 to 255 RGB components.
+
+=head2 C<blend_from_color( $color )>
+
+Coerces a value into a blend color. Accepts blessed color objects with an C<RGBA> method (Lipgloss colors), hashrefs
+with C<r>/C<g>/C<b> or C<R>/C<G>/C<B> keys (0 to 255), arrayrefs of 0 to 255 values, or existing blend colors which
+pass through untouched.
+
+=head2 C<blend_from_hsv( $h, $s, $v )>
+
+Creates a color from HSV values: hue in degrees (0 to 360), saturation and value from 0 to 1.
+
+=head2 C<to_rgb( )>
+
+Returns the color as a list of 0 to 255 integers.
+
+=head2 C<RGBA( )>
+
+Compatibility method for Lipgloss colors; returns the 0 to 255 components plus an alpha of 255.
+
+=head2 C<clamped( )>
+
+Returns a copy of the color with each component clamped to the 0 to 1 range.
+
+=head2 C<blend_lab( $to, $t )>
+
+Interpolates toward color C<$to> by C<$t> (0 to 1) through CIELAB space.
+
+=head2 C<blend_hsl( )>
+
+Returns the color's hue (0 to 1), saturation, and lightness.
+
+=head2 C<blend_hsv( )>
+
+Returns the color's hue in degrees (0 to 360), saturation, and value.
+
+=head2 C<is_dark_color( $color )>
+
+Returns true if the HSL luminance of C<$color> is below 0.5.
+
+=head2 C<complementary( $color )>
+
+Returns the color 180 degrees around the HSV wheel.
+
+=head2 C<darken( $color, $percent )>, C<lighten( $color, $percent )>
+
+Darkens by scaling RGB down, lightens by blending toward white; both take a clamped 0 to 1 percentage.
+
+=head2 C<alpha( $color, $a )>
+
+Returns a copy of the color with its alpha channel set to C<$a>.
+
+=head2 C<blend_1d( $steps, @stops )>
+
+Generates a CIELAB gradient of C<$steps> colors across the given color stops. Returns an arrayref of colors, or an
+empty list on bad input. Stops may be any value accepted by C<blend_from_color>.
+
+=head2 C<blend_2d( $width, $height, $angle, @stops )>
+
+Projects a 1D gradient at C<$angle> degrees across a C<$width> by C<$height> grid, returning an arrayref of C<< $width
+* $height >> colors in row major order.
+
+=head1 SEE ALSO
+
+L<Cancer::Lipgloss>
+
+=head1 LICENSE
+
+This software is Copyright (c) 2026 by Sanko Robinson.
+
+This is free software, licensed under:
+
+  The Artistic License 2.0 (GPL Compatible)
+
+See the F<LICENSE> file for full text.
+
+=head1 AUTHOR
+
+Sanko Robinson  L<https://github.com/sanko>
+
+=begin stopwords
+
+
+=end stopwords
+
+=cut

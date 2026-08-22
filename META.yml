@@ -94,6 +94,12 @@ provides:
   Cancer::CellBuf::Writer:
     file: lib/Cancer/CellBuf/Writer.pm
     version: v0.0.1
+  Cancer::CharmTone:
+    file: lib/Cancer/CharmTone.pm
+    version: v0.0.1
+  Cancer::Color::Blend:
+    file: lib/Cancer/Color/Blend.pm
+    version: v0.0.1
   Cancer::ColorProfile:
     file: lib/Cancer/ColorProfile.pm
     version: v0.0.1
@@ -101,7 +107,46 @@ provides:
     file: lib/Cancer/ColorProfile/Writer.pm
     version: v0.0.1
   Cancer::Lipgloss:
-    file: lib/Cancer.pm
+    file: lib/Cancer/Lipgloss.pm
+    version: v0.0.1
+  Cancer::Lipgloss::BasicColor:
+    file: lib/Cancer/Lipgloss.pm
+  Cancer::Lipgloss::Border:
+    file: lib/Cancer/Lipgloss.pm
+  Cancer::Lipgloss::Canvas:
+    file: lib/Cancer/Lipgloss/Canvas.pm
+    version: v0.0.1
+  Cancer::Lipgloss::Compositor:
+    file: lib/Cancer/Lipgloss/Compositor.pm
+    version: v0.0.1
+  Cancer::Lipgloss::IndexedColor:
+    file: lib/Cancer/Lipgloss.pm
+  Cancer::Lipgloss::Layer:
+    file: lib/Cancer/Lipgloss/Layer.pm
+    version: v0.0.1
+  Cancer::Lipgloss::LayerHit:
+    file: lib/Cancer/Lipgloss/Layer.pm
+  Cancer::Lipgloss::List:
+    file: lib/Cancer/Lipgloss/List.pm
+    version: v0.0.1
+  Cancer::Lipgloss::NoColor:
+    file: lib/Cancer/Lipgloss.pm
+  Cancer::Lipgloss::RGBColor:
+    file: lib/Cancer/Lipgloss.pm
+  Cancer::Lipgloss::Style:
+    file: lib/Cancer/Lipgloss.pm
+  Cancer::Lipgloss::Table:
+    file: lib/Cancer/Lipgloss/Table.pm
+    version: v0.0.1
+  Cancer::Lipgloss::Table::StringData:
+    file: lib/Cancer/Lipgloss/Table.pm
+  Cancer::Lipgloss::Tree:
+    file: lib/Cancer/Lipgloss/Tree.pm
+    version: v0.0.1
+  Cancer::Lipgloss::Tree::Leaf:
+    file: lib/Cancer/Lipgloss/Tree.pm
+  Cancer::Lipgloss::WhitespaceOpts:
+    file: lib/Cancer/Lipgloss.pm
   Cancer::Term:
     file: lib/Cancer/Term.pm
     version: v0.0.1

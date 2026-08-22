@@ -1,0 +1,87 @@
+=encoding utf8
+
+=head1 NAME
+
+Cancer::Lipgloss::Compositor - Stack and render overlapping layers
+
+=head1 SYNOPSIS
+
+    use Cancer::Lipgloss qw[NewLayer NewCompositor Println];
+
+    my $comp = NewCompositor( NewLayer($document), NewLayer($modal)->X(58)->Y(44) );
+    Println($comp);
+
+=head1 DESCRIPTION
+
+The Compositor flattens a tree of L<Cancer::Lipgloss::Layer> objects into an absolute-positioned, z-sorted draw list,
+paints them onto a L<Cancer::Lipgloss::Canvas>, and renders the result to a string. Layers with a higher C<Z> paint
+over lower ones, and children are positioned relative to their parents.
+
+This is the machinery behind Lipgloss' layered rendering: build layers, hand them to C<NewCompositor>, print the
+compositor.
+
+=head1 CONSTRUCTORS
+
+=head2 C<NewCompositor( @layers )>
+
+Creates a compositor with the given top level layers. Exported from L<Cancer::Lipgloss>.
+
+=head2 C<new( @layers )>
+
+Direct constructor; equivalent.
+
+=head1 METHODS
+
+=head2 C<add_layers( @layers )>
+
+Appends top level layers and re-flattens.
+
+=head2 C<bounds( )>
+
+Returns a L<Cancer::CellBuf::Geom> rect covering every layer.
+
+=head2 C<draw( $screen, $area )>
+
+Draws all layers that overlap C<$area> onto a screen object supporting C<set_cell>, in z-order.
+
+=head2 C<hit( $x, $y )>
+
+Returns the L<Cancer::Lipgloss::LayerHit> of the highest-z layer whose bounds contain the point and has an id, or an
+empty hit record.
+
+=head2 C<get_layer( $id )>
+
+Returns the layer registered under C<$id>, or undef.
+
+=head2 C<refresh( )>
+
+Rebuilds the flattened layer list. Call after moving layers around.
+
+=head2 C<render( )>
+
+Composes all layers onto a fresh canvas sized to the overall bounds and returns the rendered string.
+
+=head1 SEE ALSO
+
+L<Cancer::Lipgloss::Layer>, L<Cancer::Lipgloss::Canvas>
+
+=head1 LICENSE
+
+This software is Copyright (c) 2026 by Sanko Robinson.
+
+This is free software, licensed under:
+
+  The Artistic License 2.0 (GPL Compatible)
+
+See the F<LICENSE> file for full text.
+
+=head1 AUTHOR
+
+Sanko Robinson  L<https://github.com/sanko>
+
+=begin stopwords
+
+
+=end stopwords
+
+=cut

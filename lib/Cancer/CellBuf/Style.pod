@@ -59,24 +59,7 @@ Creates a new Style. All fields are optional:
     attrs    - Attribute bitmask (default: RESET_ATTR)
     ul_style - Underline style constant (default: NO_UNDERLINE)
 
-=head2 C<set_bold( $v )>
-
-
-=head2 C<set_faint( $v )>
-
-
-=head2 C<set_italic( $v )>
-
-
-=head2 C<set_slow_blink( $v )>
-
-=head2 C<set_rapid_blink( $v )>
-
-=head2 C<set_reverse( $v )>
-
-=head2 C<set_conceal( $v )>
-
-=head2 C<set_strikethrough( $v )>
+=head2 C<set_bold( $v )>, C<set_faint( $v )>, C<set_italic( $v )>, C<set_slow_blink( $v )>, C<set_rapid_blink( $v )>, C<set_reverse( $v )>, C<set_conceal( $v )>, C<set_strikethrough( $v )>
 
 Enable (1) or disable (0) the given attribute.
 
@@ -88,11 +71,7 @@ Set the underline style to one of the underline constants.
 
 Convenience: enables SINGLE_UNDERLINE (1) or NO_UNDERLINE (0).
 
-=head2 C<set_fg( $color )>
-
-=head2 C<set_bg( $color )>
-
-=head2 C<set_ul( $color )>
+=head2 C<set_fg( $color )>, C<set_bg( $color )>, C<set_ul( $color )>
 
 Set the foreground, background, or underline color (or C<undef> to reset).
 

@@ -1,7 +1,7 @@
 use v5.42;
 use lib 'lib';
 use blib;
-use Cancer::Lipgloss        qw[NewStyle Color Println NormalBorder];
+use Cancer::Lipgloss        qw[NewStyle Color NoColor Println NormalBorder];
 use Cancer::Lipgloss::Table qw[NewTable HEADER_ROW];
 binmode STDOUT, ':unix:utf8';
 my $base_style     = NewStyle->padding( 0, 1 );
@@ -69,7 +69,7 @@ $t->StyleFunc(
         my $even = $row % 2 == 0;
         if ( $col == 2 || $col == 3 ) {
             my $c     = $even ? \%dim_type_colors : \%type_colors;
-            my $color = $c->{ $data[$row][$col] } // Color("252");
+            my $color = $c->{ $data[$row][$col] } // NoColor();
             return $base_style->foreground($color);
         }
         if ($even) {

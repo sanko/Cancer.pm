@@ -1,0 +1,56 @@
+=encoding utf8
+
+=head1 NAME
+
+Cancer - I'm afraid it's terminal...
+
+=head1 SYNOPSIS
+
+    use Cancer;
+    ...;
+
+=head1 DESCRIPTION
+
+Cancer is a collection of modules for building rich text terminal user interfaces: ANSI-aware string processing, color
+blending, cell buffers, and a Perl port of L<Charm Lipgloss|https://github.com/charmbracelet/lipgloss>.
+
+The distribution is organized around these packages:
+
+=over
+
+=item L<Cancer::Lipgloss> - styles, borders, layout, and compositing.
+
+=item L<Cancer::CellBuf::Writer> - cell buffer rendering and downsampling.
+
+=item L<Cancer::Color::Blend> - color space math (CIELAB, HSL, HSV).
+
+=item L<Cancer::CharmTone> - the CharmTone color palette as constants.
+
+=back
+
+This top level module declares the namespace and currently serves little more purpose than existing loudly.
+
+=head1 SEE ALSO
+
+L<Cancer::Lipgloss>
+
+=head1 LICENSE
+
+This software is Copyright (c) 2026 by Sanko Robinson.
+
+This is free software, licensed under:
+
+  The Artistic License 2.0 (GPL Compatible)
+
+See the F<LICENSE> file for full text.
+
+=head1 AUTHOR
+
+Sanko Robinson  L<https://github.com/sanko>
+
+=begin stopwords
+
+
+=end stopwords
+
+=cut

@@ -38,12 +38,7 @@ Screen rendering.
 
 Creates a new buffer. If C<width> and C<height> are > 0, the buffer is pre-filled.
 
-=head2 C<width( )>
-
-
-=head2 C<height( )>
-
-=head2 C<bounds( )>
+=head2 C<width( )>, C<height( )>, C<bounds( )>
 
 Dimensions and bounding rectangle.
 

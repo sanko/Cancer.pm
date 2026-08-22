@@ -11,15 +11,27 @@ use Cancer;
 
 # DESCRIPTION
 
-TODO
+Cancer is a collection of modules for building rich text terminal user
+interfaces: ANSI-aware string processing, color blending, cell buffers, and a
+Perl port of [Charm Lipgloss](https://github.com/charmbracelet/lipgloss).
 
-# See Also
+The distribution is organized around these packages:
 
-TODO
+- [Cancer::Lipgloss](https://metacpan.org/pod/Cancer%3A%3ALipgloss) - styles, borders, layout, and compositing.
+- [Cancer::CellBuf::Writer](https://metacpan.org/pod/Cancer%3A%3ACellBuf%3A%3AWriter) - cell buffer rendering and downsampling.
+- [Cancer::Color::Blend](https://metacpan.org/pod/Cancer%3A%3AColor%3A%3ABlend) - color space math (CIELAB, HSL, HSV).
+- [Cancer::CharmTone](https://metacpan.org/pod/Cancer%3A%3ACharmTone) - the CharmTone color palette as constants.
+
+This top level module declares the namespace and currently serves little more
+purpose than existing loudly.
+
+# SEE ALSO
+
+[Cancer::Lipgloss](https://metacpan.org/pod/Cancer%3A%3ALipgloss)
 
 # LICENSE
 
-This software is Copyright (c) 2020 by Sanko Robinson.
+This software is Copyright (c) 2026 by Sanko Robinson.
 
 This is free software, licensed under:
 

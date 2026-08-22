@@ -99,16 +99,27 @@ Returns the singleton empty cell (width 0, no rune).
 
 =back
 
-=head1 AUTHOR
-
-Cancer Contributors
-
-=head1 LICENSE
-
-This library is free software; you can redistribute it and/or modify it under the same terms as Perl itself.
-
 =head1 SEE ALSO
 
 L<Cancer::Ansi>, L<Cancer::Ansi::Parser>
+
+=head1 LICENSE
+
+This software is Copyright (c) 2026 by Sanko Robinson.
+
+This is free software, licensed under:
+
+  The Artistic License 2.0 (GPL Compatible)
+
+See the F<LICENSE> file for full text.
+
+=head1 AUTHOR
+
+Sanko Robinson  L<https://github.com/sanko>
+
+=begin stopwords
+
+
+=end stopwords
 
 =cut

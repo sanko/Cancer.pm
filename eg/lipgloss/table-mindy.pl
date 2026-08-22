@@ -11,7 +11,7 @@ sub make_row {
     my ( $start, $end ) = @_;
     my @row;
     for my $i ( $start .. $end ) {
-        push @row, "$i", " " x 6;
+        push @row, "$i", "";
     }
     push @row, "" while @row < 12;
     return \@row;

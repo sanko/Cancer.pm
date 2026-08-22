@@ -104,15 +104,11 @@ Returns the Cell at (C<$x>, C<$y>) from the new buffer.
 
 Sets a cell and marks the line as touched.
 
-=head2 C<fill( $cell )>
-
-=head2 C<fill_rect( $cell, $rect )>
+=head2 C<fill( $cell )>, C<fill_rect( $cell, $rect )>
 
 Fill operations on the new buffer.
 
-=head2 C<clear( )>
-
-=head2 C<clear_rect( $rect )>
+=head2 C<clear( )>, C<clear_rect( $rect )>
 
 Clear operations on the new buffer.
 
@@ -132,15 +128,11 @@ Resizes the screen and buffers.
 
 Forces a full redraw on next render.
 
-=head2 C<show_cursor( )>
-
-=head2 C<hide_cursor( )>
+=head2 C<show_cursor( )>, C<hide_cursor( )>
 
 Toggles cursor visibility.
 
-=head2 C<enter_alt_screen( )>
-
-=head2 C<exit_alt_screen( )>
+=head2 C<enter_alt_screen( )>, C<exit_alt_screen( )>
 
 Enters/exits alternate screen buffer mode.
 

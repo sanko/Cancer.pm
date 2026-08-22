@@ -49,7 +49,7 @@ L<Cancer::Lipgloss::RGBColor>.
 
 Returns a L<Cancer::Lipgloss::NoColor> object (represents no color / transparent).
 
-=head2 NormalBorder(), RoundedBorder(), ThickBorder(), DoubleBorder(), HiddenBorder(), MarkdownBorder(), ASCIIBorder(), NoBorder()
+=head2 NormalBorder(), RoundedBorder(), BlockBorder(), ThickBorder(), DoubleBorder(), HiddenBorder(), MarkdownBorder(), ASCIIBorder(), NoBorder(), OuterHalfBlockBorder(), InnerHalfBlockBorder()
 
 Return predefined L<Cancer::Lipgloss::Border> objects.
 
@@ -63,15 +63,89 @@ vertical alignment.
 Joins multiple strings vertically. C<$position> is one of C<Left>, C<Center>, or C<Right> and controls horizontal
 alignment.
 
-=head2 PlaceHorizontal($width, $position, $string)
+=head2 PlaceHorizontal($width, $position, $string, @options)
 
 Places a string in a horizontal box of the given width. C<$position> controls horizontal placement (C<Left>, C<Center>,
 C<Right>).
 
-=head2 PlaceVertical($height, $position, $string)
+=head2 PlaceVertical($height, $position, $string, @options)
 
 Places a string in a vertical box of the given height. C<$position> controls vertical placement (C<Top>, C<Center>,
 C<Bottom>).
+
+=head2 Place($width, $height, $hpos, $vpos, $string, @options)
+
+Places a string in a box of the given dimensions; combines both placements.
+
+The optional trailing arguments to the place functions are whitespace options: pass C<WithWhitespaceChars($chars)> to
+fill gaps with specific characters or C<WithWhitespaceStyle($style)> to style the filler.
+
+=head2 LightDark($is_dark)
+
+Returns a coderef that picks between a light and dark color: C<< my $pick = LightDark(1); $pick->( $light, $dark ); >>.
+
+=head2 AdaptiveColor(light => $c1, dark => $c2)
+
+Picks between two colors based on C<has_dark_background>.
+
+=head2 Complete($profile)
+
+Returns a coderef selecting among three colors for the given profile name (C<ANSI>, C<ANSI256>, or C<TrueColor>).
+
+=head2 has_dark_background( ), query_terminal_bg( )
+
+Query the terminal for its background color; C<query_terminal_bg> returns the parsed RGB triple (or undef on
+timeout/failure), C<has_dark_background> returns true when it is a dark color.
+
+=head2 StyleRanges($string, @ranges)
+
+Renders each byte range of C<$string> with its range's style.
+
+=head2 NewRange($start, $end, $style)
+
+Creates a range hashref for C<StyleRanges>.
+
+=head2 StyleRunes($string, \@indices, $matched_style, $unmatched_style)
+
+Styles individual runes (characters) of a string at the given indices.
+
+=head2 blend_1d($steps, @stops), blend_2d($width, $height, $angle, @stops)
+
+Gradient helpers re-exported from L<Cancer::Color::Blend>.
+
+=head2 Print(@strings), Println(@strings), Printf($fmt, @args)
+
+Write to STDOUT with automatic color downsampling for the detected terminal profile; C<Println> appends a newline. They
+return the number of bytes written.
+
+=head2 Fprint($fh, ...), Fprintln($fh, ...), Fprintf($fh, $fmt, ...)
+
+The same, writing to a filehandle.
+
+=head2 Sprint(...), Sprintln(...), Sprintf(...)
+
+The same, returning the string instead of printing.
+
+=head2 NewCanvas(%args), NewLayer($content, @layers), NewLayerHit(%args), NewCompositor(@layers)
+
+Constructors for layered rendering; see L<Cancer::Lipgloss::Canvas>, L<Cancer::Lipgloss::Layer>, and
+L<Cancer::Lipgloss::Compositor>.
+
+=head2 Black(), Red(), Green(), Yellow(), Blue(), Magenta(), Cyan(), White(), BrightBlack(), BrightRed(), BrightGreen(), BrightYellow(), BrightBlue(), BrightMagenta(), BrightCyan(), BrightWhite()
+
+The 16 standard ANSI colors as color objects.
+
+=head2 UnderlineNone, UnderlineSingle, UnderlineDouble, UnderlineCurly, UnderlineDotted, UnderlineDashed
+
+Underline style constants for C<< ->underline_style($n) >>.
+
+=head2 NoTabConversion
+
+Constant disabling tab conversion during render.
+
+=head2 NBSP
+
+The non-breaking space character used by some styles.
 
 =head2 string_width($string)
 
@@ -102,13 +176,16 @@ Style objects support these setters (each returns a clone):
     ->margin_top($n)           ->margin_right($n)
     ->margin_bottom($n)        ->margin_left($n)
     ->align_horizontal($pos)   ->align_vertical($pos)
+    ->align($pos)              ->underline_style($n)
     ->border_style($border)    ->border_top($bool)
     ->border_right($bool)      ->border_bottom($bool)
     ->border_left($bool)
     ->hyperlink($url)          ->tab_width($n)
-    ->inherit($base_style)
+    ->max_width($n)            ->max_height($n)
+    ->set_string($str)         ->inherit($base_style)
 
-Each setter has a corresponding C<get_*> getter.
+Each setter has a corresponding C<get_*> getter. C<align> sets both horizontal and vertical alignment at once;
+C<set_string> stores content for later rendering via stringification.
 
 Colors can be passed as:
 
@@ -155,14 +232,35 @@ C<middle>, C<middle_left>, C<middle_right>, C<middle_top>, C<middle_bottom>.
 
 =item L<Cancer::Lipgloss::Table> - Table rendering
 
+=item L<Cancer::Lipgloss::Canvas> - Cell grid for composited output
+
+=item L<Cancer::Lipgloss::Layer> - Positioned, z-ordered content
+
+=item L<Cancer::Lipgloss::Compositor> - Layer stacking and rendering
+
 =back
 
-=head1 AUTHOR
+=head1 SEE ALSO
 
-Cancer.pm contributors
+L<Cancer::CellBuf>
 
 =head1 LICENSE
 
-This library is free software; you can redistribute it and/or modify it under the same terms as Perl itself.
+This software is Copyright (c) 2026 by Sanko Robinson.
+
+This is free software, licensed under:
+
+  The Artistic License 2.0 (GPL Compatible)
+
+See the F<LICENSE> file for full text.
+
+=head1 AUTHOR
+
+Sanko Robinson  L<https://github.com/sanko>
+
+=begin stopwords
+
+
+=end stopwords
 
 =cut
