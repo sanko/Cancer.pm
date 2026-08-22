@@ -1617,7 +1617,7 @@ package Cancer::Lipgloss v0.0.1 {
             bottom_right  => '┛',
             middle_left   => '┣',
             middle_right  => '┫',
-            middle        => '┻',
+            middle        => '╋',
             middle_top    => '┳',
             middle_bottom => '┻'
         );
@@ -1701,15 +1701,10 @@ package Cancer::Lipgloss v0.0.1 {
             bottom        => '▄',
             left          => '▌',
             right         => '▐',
-            top_left      => '█',
-            top_right     => '█',
-            bottom_left   => '█',
-            bottom_right  => '█',
-            middle_left   => '▌',
-            middle_right  => '▐',
-            middle        => '█',
-            middle_top    => '▀',
-            middle_bottom => '▄'
+            top_left      => '▛',
+            top_right     => '▜',
+            bottom_left   => '▙',
+            bottom_right  => '▟'
         );
     }
 
@@ -1719,15 +1714,10 @@ package Cancer::Lipgloss v0.0.1 {
             bottom        => '▀',
             left          => '▐',
             right         => '▌',
-            top_left      => ' ',
-            top_right     => ' ',
-            bottom_left   => ' ',
-            bottom_right  => ' ',
-            middle_left   => '▐',
-            middle_right  => '▌',
-            middle        => ' ',
-            middle_top    => '▄',
-            middle_bottom => '▀'
+            top_left      => '▗',
+            top_right     => '▖',
+            bottom_left   => '▝',
+            bottom_right  => '▘'
         );
     }
 
