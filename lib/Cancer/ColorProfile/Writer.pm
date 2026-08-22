@@ -1,10 +1,9 @@
 use v5.42;
+use feature 'declared_refs';
 use experimental 'class';
 class Cancer::ColorProfile::Writer v0.0.1 {
     use Cancer::Ansi::Parser qw[
-        new_parser parser_reset DecodeSequence HasCsiPrefix HasOscPrefix
-        param command params MissingParam ParamVal HasMore
-        _read_style_color
+        _read_style_color MissingParam HasMoreFlag ParamVal
     ];
     use Cancer::Ansi         qw[ResetStyle Strip];
     use Cancer::ColorProfile qw[TrueColor NoTTY ASCII ANSI ANSI256 Unknown Detect];
@@ -36,31 +35,46 @@ class Cancer::ColorProfile::Writer v0.0.1 {
     }
 
     method _downsample ($data) {
-        my $parser = new_parser();
-        my $state  = 0;
-        my $out    = '';
-        while ( length $data ) {
-            parser_reset($parser);
-            my ( $seq, $width, $n, $new_state ) = DecodeSequence( $data, $state, $parser );
-            $state = $new_state;
-            if ( HasCsiPrefix($seq) && command($parser) == ord('m') ) {
-                $out .= _handle_sgr( $profile, $parser );
-            }
-            else {
-                $out .= $seq;
-            }
-            $data = substr( $data, $n );
+
+        # FAST PATH: no escape sequences at all -> nothing to downsample. This
+        # skips all pattern work for plain text, which dominates UI output.
+        if ( index( $data, "\e" ) == -1 ) {
+            return $self->_write_raw($data);
         }
-        return $self->_write_raw($out);
+
+        # Regex rewrite: the only transformation downsampling performs is
+        # rewriting SGR sequences; every other sequence and every printable
+        # byte passes through verbatim, so a single targeted s///ge replaces
+        # the per-rune DecodeSequence walk (orders of magnitude faster under
+        # the interpreter). Sequences that are not plain SGRs (private
+        # prefixes, intermediates) do not match and pass through untouched.
+        $data =~ s{(?:\e\[|\x9b)([0-9;:]*)m}{_rewrite_sgr_params( $profile, $1 )}ge;
+        return $self->_write_raw($data);
     }
 
-    sub _handle_sgr ( $p, $parser ) {
-        my @params   = params($parser);
-        my $n_params = scalar @params;
+    # Pack a raw SGR parameter string ("38;2;r;g;b", "38:2::r:g:b", ";31")
+    # into the parser's packed param representation: empty fields become
+    # MissingParam and a ':' continuation sets HasMoreFlag on its field.
+    sub _pack_sgr_params ($str) {
+        return () unless length $str;
+        my @packed;
+        for my $field ( split /;/, $str, -1 ) {
+            my @subs = split /:/, $field, -1;
+            for my $j ( 0 .. $#subs ) {
+                my $p = $subs[$j] eq '' ? MissingParam : int( $subs[$j] );
+                $p |= HasMoreFlag if $j < $#subs;
+                push @packed, $p;
+            }
+        }
+        return @packed;
+    }
+
+    sub _rewrite_sgr_params ( $p, $str ) {
+        my @params = _pack_sgr_params($str);
         my @parts;
         my $i = 0;
-        while ( $i < $n_params ) {
-            my ( $val, $has_more ) = param( { params => \@params, paramsLen => $n_params }, $i, 0 );
+        while ( $i <= $#params ) {
+            my $val = ParamVal( $params[$i], 0 );
             if ( $val == 0 ) {
                 push @parts, '';
             }

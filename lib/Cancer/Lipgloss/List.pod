@@ -1,0 +1,100 @@
+=encoding utf8
+
+=head1 NAME
+
+Cancer::Lipgloss::List - List rendering for terminals
+
+=head1 SYNOPSIS
+
+    use Cancer::Lipgloss::List qw[NewList ArabicEnumerator RomanEnumerator];
+
+    my $groceries = NewList()
+        ->Item("Milk")
+        ->Item("Eggs")
+        ->Items("Bread", "Butter");
+
+    print "$groceries\n";
+
+    # Nested lists
+    my $nested = NewList()
+        ->Item("Fruits")
+        ->Item(NewList()
+            ->Item("Apple")
+            ->Item("Banana"))
+        ->Item("Vegetables");
+
+    # Different enumerators
+    my $roman = NewList()
+        ->Enumerator(\&RomanEnumerator)
+        ->Items("Introduction", "Methods", "Results");
+
+=head1 DESCRIPTION
+
+A Perl port of C<charmbracelet/lipgloss/list>. Builds lists with customizable enumerators and nested sub-lists. Uses
+L<Cancer::Lipgloss::Tree> internally.
+
+=head1 FUNCTIONS
+
+=head2 NewList(@items)
+
+Returns a new list with the given items. Default enumerator is C<BulletEnumerator>.
+
+=head2 BulletEnumerator($items, $index)
+
+Returns C<bullet> character.
+
+=head2 DashEnumerator($items, $index)
+
+Returns C<->.
+
+=head2 AsteriskEnumerator($items, $index)
+
+Returns C<*>.
+
+=head2 ArabicEnumerator($items, $index)
+
+Returns C<1.>, C<2.>, C<3.>, etc.
+
+=head2 AlphabetEnumerator($items, $index)
+
+Returns C<A.>, C<B.>, C<C.>, etc.
+
+=head2 RomanEnumerator($items, $index)
+
+Returns C<I.>, C<II.>, C<III.>, etc.
+
+=head1 METHODS
+
+=head2 Item($item)
+
+Appends a single item (string, list, or tree).
+
+=head2 Items(@items)
+
+Appends multiple items.
+
+=head2 Enumerator(\&fn)
+
+Sets the enumerator function C<< fn($items, $index) >>.
+
+=head2 Indenter(\&fn)
+
+Sets the indenter function C<< fn($items, $index) >>.
+
+=head2 EnumeratorStyle($style)
+
+Applies a style to all enumerators.
+
+=head2 ItemStyle($style)
+
+Applies a style to all items.
+
+=head2 Hide($bool)
+
+Hides or shows the list.
+
+=head1 SEE ALSO
+
+L<Cancer::Lipgloss>, L<Cancer::Lipgloss::Tree>, L<Cancer::Lipgloss::Table>
+
+=cut

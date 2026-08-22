@@ -1,0 +1,126 @@
+=encoding utf8
+
+=head1 NAME
+
+Cancer::Lipgloss::Tree - Tree rendering for terminals
+
+=head1 SYNOPSIS
+
+    use Cancer::Lipgloss::Tree qw[RootTree DefaultEnumerator RoundedEnumerator];
+
+    my $tree = RootTree("project/")
+        ->Child(
+            RootTree("src/")
+                ->Child("main.pm", "utils.pm"),
+            RootTree("t/")
+                ->Child("01_basic.t"),
+            "README.md",
+        );
+
+    print "$tree\n";
+
+    # Custom enumerator
+    my $rounded = RootTree("Root")
+        ->Enumerator(\&RoundedEnumerator)
+        ->Child("A", "B", "C");
+
+    # Styled enumerators
+    my $styled = RootTree("Root")
+        ->EnumeratorStyle(NewStyle()->foreground([255, 0, 0]))
+        ->ItemStyle(NewStyle()->foreground([255, 255, 255]))
+        ->Child("colored item");
+
+=head1 DESCRIPTION
+
+A Perl port of C<charmbracelet/lipgloss/tree>. Builds and renders tree structures with customizable enumerators,
+indenters, and per-item styling.
+
+=head1 FUNCTIONS
+
+=head2 NewTree()
+
+Returns a new empty tree.
+
+=head2 RootTree($value)
+
+Creates a tree with the given root value. Shorthand for C<< NewTree()->Root($value) >>.
+
+=head2 DefaultEnumerator($children, $index)
+
+Default box-drawing enumerator: C<├──> for non-last, C<└──> for last.
+
+=head2 RoundedEnumerator($children, $index)
+
+Rounded enumerator: C<╰──> for last child.
+
+=head2 DefaultIndenter($children, $index)
+
+Default indenter: C<│  > for non-last, C<   > for last.
+
+=head1 METHODS
+
+=head2 Root($value)
+
+Sets the root value of the tree.
+
+=head2 Child(@children)
+
+Adds children (strings, leaves, or sub-trees).
+
+=head2 Hide($bool)
+
+Hides or shows the tree node.
+
+=head2 Enumerator(\&fn)
+
+Sets the enumerator function C<< fn($children, $index) >>.
+
+=head2 Indenter(\&fn)
+
+Sets the indenter function C<< fn($children, $index) >>.
+
+=head2 EnumeratorStyle($style)
+
+Applies a style to all enumerators.
+
+=head2 EnumeratorStyleFunc(\&fn)
+
+Sets a style function C<< fn($children, $index) -> Style >>.
+
+=head2 IndenterStyle($style)
+
+Applies a style to all indenters.
+
+=head2 IndenterStyleFunc(\&fn)
+
+Sets a style function for indenters.
+
+=head2 ItemStyle($style)
+
+Applies a style to all item values.
+
+=head2 ItemStyleFunc(\&fn)
+
+Sets a style function for items.
+
+=head2 RootStyle($style)
+
+Applies a style to the root node.
+
+=head2 Width($n)
+
+Sets the fixed width of the tree (items padded to fit).
+
+=head2 Offset($start, $end)
+
+Slices children. C<$start> is the first visible index, C<$end> is how many to skip from the end.
+
+=head2 Value(), Hidden(), Children()
+
+Read-only accessors.
+
+=head1 SEE ALSO
+
+L<Cancer::Lipgloss>, L<Cancer::Lipgloss::List>, L<Cancer::Lipgloss::Table>
+
+=cut

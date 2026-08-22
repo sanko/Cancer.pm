@@ -130,7 +130,9 @@ package Cancer::ColorProfile v0.0.1 {
 
     # Detect profile from a writer/filehandle and environment.
     # In Perl, we use %ENV directly (unlike Go which passes []string).
-    sub Detect ( $output, $environ = \%ENV ) {
+    sub Detect {
+        my $output  = shift;
+        my $environ = @_ ? shift : \%ENV;
         my $isatty  = is_tty_forced($environ) || force_color($environ) || _is_tty($output);
         my $term    = $environ->{TERM} // '';
         my $is_dumb = ( $term eq '' || $term eq 'dumb' );
@@ -147,7 +149,7 @@ package Cancer::ColorProfile v0.0.1 {
     }
 
     # Detect profile purely from environment variables (assumes isatty).
-    sub Env ( $environ //= \%ENV ) { return _color_profile( 1, $environ ) }
+    sub Env { my $environ = @_ ? shift : \%ENV; return _color_profile( 1, $environ ) }
 
     sub _color_profile ( $isatty, $environ ) {
         my $term    = $environ->{TERM} // '';

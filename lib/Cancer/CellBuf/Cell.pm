@@ -21,6 +21,7 @@ class Cancer::CellBuf::Cell v0.0.1 {
     }
     method set_style ($s) { $style = $s; return $self }
     method set_link  ($l) { $link  = $l; return $self }
+    method set_width ($w) { $width = $w; return $self }
 
     method string () {
         return '' unless $rune;

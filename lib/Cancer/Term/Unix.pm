@@ -58,11 +58,23 @@ package Cancer::Term::Unix v0.0.1 {
     my $USE_SYSCALL;
     my $SYS_IOCTL;
     if ( $^O eq 'linux' ) {
-        require Config;
-        my $arch = $Config::Config{archname} // '';
-        if    ( $arch =~ /x86_64/ )  { $SYS_IOCTL = 16 }
-        elsif ( $arch =~ /aarch64/ ) { $SYS_IOCTL = 29 }
-        else                         { $SYS_IOCTL = 54 }    # i386, arm, etc.
+
+        # Prefer the kernel-provided number from syscall.ph (via h2ph) when it
+        # is available; fall back to the well-known per-arch numbers otherwise.
+        my $ok = eval {
+            require 'syscall.ph';
+            defined &main::SYS_ioctl ? 1 : 0;
+        };
+        if ( $ok && &main::SYS_ioctl ) {
+            $SYS_IOCTL = int(&main::SYS_ioctl);
+        }
+        else {
+            require Config;
+            my $arch = $Config::Config{archname} // '';
+            if    ( $arch =~ /x86_64/ )  { $SYS_IOCTL = 16 }
+            elsif ( $arch =~ /aarch64/ ) { $SYS_IOCTL = 29 }
+            else                         { $SYS_IOCTL = 54 }    # i386, arm, etc.
+        }
         $USE_SYSCALL = 1;
     }
 

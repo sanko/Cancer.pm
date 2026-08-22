@@ -16,6 +16,7 @@ cover_db/
 
 *.bak
 *.old
+*.exe
 *~
 
 !LICENSE
@@ -41,3 +42,4 @@ eg/lib/*.pm
 
 tty-*
 vendor/
+tmp*

@@ -1,0 +1,12 @@
+use v5.42;
+use lib 'lib';
+use blib;
+binmode STDOUT, ':unix:utf8';
+use Cancer::Lipgloss        qw[NewStyle Color Println];
+use Cancer::Lipgloss::Table qw[NewTable];
+my $s = NewStyle->foreground( Color("240") );
+my $t = NewTable;
+$t->Row( "Bubble Tea",  $s->render("Milky") );
+$t->Row( "Milk Tea",    $s->render("Also milky") );
+$t->Row( "Actual milk", $s->render("Milky as well") );
+Println( $t->String );

@@ -1,0 +1,168 @@
+=encoding utf8
+
+=head1 NAME
+
+Cancer::Lipgloss - High-level terminal styling library for Perl
+
+=head1 SYNOPSIS
+
+    use Cancer::Lipgloss qw[
+        NewStyle Color NoColor
+        NormalBorder RoundedBorder
+        JoinHorizontal JoinVertical
+        Left Center Right Top Bottom
+        PlaceHorizontal PlaceVertical
+        string_width width height
+    ];
+
+    # Style text
+    my $styled = NewStyle()
+        ->bold(1)
+        ->foreground([255, 100, 50])
+        ->padding_left(2)
+        ->render("Hello, world!");
+
+    # Join two multi-line strings side by side
+    my $joined = JoinHorizontal(Top, $left, $right);
+
+    # Place text in a fixed-width box
+    my $centered = PlaceHorizontal(40, Center, "centered");
+
+=head1 DESCRIPTION
+
+Cancer::Lipgloss is a Perl port of L<https://github.com/charmbracelet/lipgloss>, a high-level terminal styling library.
+It provides a fluent API for building styled text with foreground/background colors, bold, italic, borders, padding,
+margins, alignment, and more.
+
+=head1 FUNCTIONS
+
+=head2 NewStyle()
+
+Returns a new L<Cancer::Lipgloss::Style> object. All methods return a new clone (chaining is safe).
+
+=head2 Color($hex_or_string)
+
+Parses a color from a string. Supports C<#RRGGBB>, C<#RGB>, C<rgb:RRRR/GGGG/BBBB>, and similar formats. Returns an
+L<Cancer::Lipgloss::RGBColor>.
+
+=head2 NoColor()
+
+Returns a L<Cancer::Lipgloss::NoColor> object (represents no color / transparent).
+
+=head2 NormalBorder(), RoundedBorder(), ThickBorder(), DoubleBorder(), HiddenBorder(), MarkdownBorder(), ASCIIBorder(), NoBorder()
+
+Return predefined L<Cancer::Lipgloss::Border> objects.
+
+=head2 JoinHorizontal($position, @strings)
+
+Joins multiple multi-line strings horizontally. C<$position> is one of C<Left>, C<Center>, or C<Right> and controls
+vertical alignment.
+
+=head2 JoinVertical($position, @strings)
+
+Joins multiple strings vertically. C<$position> is one of C<Left>, C<Center>, or C<Right> and controls horizontal
+alignment.
+
+=head2 PlaceHorizontal($width, $position, $string)
+
+Places a string in a horizontal box of the given width. C<$position> controls horizontal placement (C<Left>, C<Center>,
+C<Right>).
+
+=head2 PlaceVertical($height, $position, $string)
+
+Places a string in a vertical box of the given height. C<$position> controls vertical placement (C<Top>, C<Center>,
+C<Bottom>).
+
+=head2 string_width($string)
+
+Returns the visual width of a string (ANSI escape codes stripped).
+
+=head2 width($string)
+
+Alias for C<string_width>.
+
+=head2 height($string)
+
+Returns the number of lines in a string.
+
+=head2 LEFT, CENTER, RIGHT, TOP, BOTTOM
+
+Position constants for alignment functions.
+
+=head1 STYLE PROPERTIES
+
+Style objects support these setters (each returns a clone):
+
+    ->bold($bool)              ->italic($bool)
+    ->underline($bool)         ->strikethrough($bool)
+    ->foreground($color)       ->background($color)
+    ->width($n)                ->height($n)
+    ->padding_top($n)          ->padding_right($n)
+    ->padding_bottom($n)       ->padding_left($n)
+    ->margin_top($n)           ->margin_right($n)
+    ->margin_bottom($n)        ->margin_left($n)
+    ->align_horizontal($pos)   ->align_vertical($pos)
+    ->border_style($border)    ->border_top($bool)
+    ->border_right($bool)      ->border_bottom($bool)
+    ->border_left($bool)
+    ->hyperlink($url)          ->tab_width($n)
+    ->inherit($base_style)
+
+Each setter has a corresponding C<get_*> getter.
+
+Colors can be passed as:
+
+    # RGBColor object
+    $style->foreground(Color("#FF8000"));
+
+    # Arrayref [R, G, B] (0-255)
+    $style->foreground([255, 128, 0]);
+
+=head1 OBJECTS
+
+=head2 Cancer::Lipgloss::Style
+
+The main style object. Created by C<NewStyle()>.
+
+=head2 Cancer::Lipgloss::RGBColor
+
+Represents an RGB color. Has C<->RGBA()> returning (R, G, B, A) and C<->is_no_color()> returning false.
+
+=head2 Cancer::Lipgloss::NoColor
+
+Represents absence of color. C<->is_no_color()> returns true.
+
+=head2 Cancer::Lipgloss::BasicColor
+
+Represents one of the 16 ANSI basic colors.
+
+=head2 Cancer::Lipgloss::IndexedColor
+
+Represents one of the 256 indexed terminal colors.
+
+=head2 Cancer::Lipgloss::Border
+
+A hashref with keys C<top>, C<bottom>, C<left>, C<right>, C<top_left>, C<top_right>, C<bottom_left>, C<bottom_right>,
+C<middle>, C<middle_left>, C<middle_right>, C<middle_top>, C<middle_bottom>.
+
+=head1 SUB-PACKAGES
+
+=over 4
+
+=item L<Cancer::Lipgloss::Tree> - Tree rendering
+
+=item L<Cancer::Lipgloss::List> - List rendering
+
+=item L<Cancer::Lipgloss::Table> - Table rendering
+
+=back
+
+=head1 AUTHOR
+
+Cancer.pm contributors
+
+=head1 LICENSE
+
+This library is free software; you can redistribute it and/or modify it under the same terms as Perl itself.
+
+=cut

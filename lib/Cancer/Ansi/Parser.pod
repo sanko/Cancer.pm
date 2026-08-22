@@ -184,13 +184,17 @@ C<HasEscPrefix>.
 
 =head1 DECODE SEQUENCES
 
-=head2 C<DecodeSequence( $bytes, $state, $parser )>
+=head2 C<DecodeSequence( $bytes, $state, $parser, $pos = 0 )>
 
 A secondary scanner that walks C<$bytes> looking for the first complete sequence. Returns a four-element list C<($seq,
 $is_printable, $bytes_consumed, $new_state)>. C<$seq> is the matched text (a printable grapheme cluster or the raw
 sequence bytes), C<$is_printable> is true for text, and C<$new_state> is one of C<NormalState>, C<DecodePrefixState>,
 C<DecodeParamsState>, C<DecodeIntermedState>, C<DecodeEscapeState> or C<DecodeStringState>. When a parser hashref is
 supplied, its command/params/data fields are updated to mirror the sequence as it is scanned.
+
+The optional C<$pos> offset starts the scan mid-buffer; both C<$seq> and C<$bytes_consumed> stay relative to C<$pos>.
+Callers that decode a whole buffer should loop with an advancing offset instead of re-slicing the string after every
+sequence, which copies the entire remainder on each iteration and makes the walk quadratic.
 
 =head1 SEE ALSO
 

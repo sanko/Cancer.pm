@@ -2,6 +2,7 @@ use v5.42;
 
 package Cancer::CellBuf::Wrap v0.0.1 {
     use Exporter qw[import];
+    use Encode;
     our @EXPORT_OK = qw[wrap_text _read_style _read_link];
     use Cancer::Ansi::Parser qw[
         new_parser parser_reset DecodeSequence HasCsiPrefix HasOscPrefix
@@ -128,6 +129,10 @@ package Cancer::CellBuf::Wrap v0.0.1 {
     sub wrap_text ( $str, $limit, $breakpoints = '' ) {
         return '' unless defined $str && length $str;
         return $str if $limit < 1;
+
+        # DecodeSequence expects raw bytes; ensure we have them
+        my $was_utf8 = utf8::is_utf8($str);
+        $str = Encode::encode( 'UTF-8', $str ) if $was_utf8;
         my $p = new_parser();
         my ( $buf, $word, $space )   = ( '', '', '' );
         my ( $style, $cur_style )    = ( Cancer::CellBuf::Style->new, Cancer::CellBuf::Style->new );
@@ -172,8 +177,14 @@ package Cancer::CellBuf::Wrap v0.0.1 {
             $space     = '';
         };
         my $bps = [ split //, $breakpoints ];
-        while ( length $str ) {
-            my ( $seq, $width, $n, $new_state ) = DecodeSequence( $str, $state, $p );
+
+        # Offset-based walk: passing $pos into DecodeSequence avoids the
+        # quadratic substr-chop loop (each chop copies the whole remainder).
+        my $slen = length $str;
+        my $pos  = 0;
+        while ( $pos < $slen ) {
+            my ( $seq, $width, $n, $new_state ) = DecodeSequence( $str, $state, $p, $pos );
+            $pos += $n;
             $state = $new_state;
             if ( $width == 0 ) {
                 if ( $seq eq "\t" ) {
@@ -240,7 +251,6 @@ package Cancer::CellBuf::Wrap v0.0.1 {
                     }
                 }
             }
-            $str = substr( $str, $n );
         }
         if ( $word_len == 0 ) {
             if ( $cur_width + length($space) > $limit ) {
@@ -258,6 +268,7 @@ package Cancer::CellBuf::Wrap v0.0.1 {
         if ( !$cur_style->empty ) {
             $buf .= ResetStyle();
         }
+        $buf = Encode::decode( 'UTF-8', $buf ) if $was_utf8;
         return $buf;
     }
 }

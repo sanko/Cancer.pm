@@ -1,0 +1,21 @@
+use v5.42;
+use lib 'lib';
+use blib;
+use Cancer::Lipgloss qw[NewStyle Color has_dark_background LightDark AdaptiveColor Println RoundedBorder JoinVertical];
+binmode STDOUT, ':unix:utf8';
+my $frame_color       = AdaptiveColor( Light => Color("#C5ADF9"), Dark => Color("#864EFF") );
+my $text_color        = AdaptiveColor( Light => Color("#696969"), Dark => Color("#bdbdbd") );
+my $keyword_color     = AdaptiveColor( Light => Color("#37CD96"), Dark => Color("#22C78A") );
+my $inactive_bg_color = AdaptiveColor( Light => Color("#988F95"), Dark => Color("#978692") );
+my $inactive_fg_color = AdaptiveColor( Light => Color("#FDFCE3"), Dark => Color("#FBFAE7") );
+my $frame_style       = NewStyle->border( RoundedBorder() )->border_foreground($frame_color)->padding( 1, 3 )->margin( 1, 3 );
+my $paragraph_style   = NewStyle->width(40)->margin_bottom(1)->align(0.5);
+my $text_style        = NewStyle->foreground($text_color);
+my $keyword_style     = NewStyle->foreground($keyword_color)->bold(1);
+my $active_button     = NewStyle->padding( 0, 3 )->background( Color("#FF6AD2") )->foreground( Color("#FFFCC2") );
+my $inactive_button   = $active_button->background($inactive_bg_color)->foreground($inactive_fg_color);
+my $text              = $paragraph_style->render(
+    $text_style->render("Are you sure you want to eat that ") . $keyword_style->render("moderatly ripe") . $text_style->render(" banana?") );
+my $buttons = $active_button->render("Yes") . "  " . $inactive_button->render("No");
+my $block   = $frame_style->render( JoinVertical( 0.5, $text, $buttons ) );
+Println($block);

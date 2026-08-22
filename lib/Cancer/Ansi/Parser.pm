@@ -756,11 +756,30 @@ package Cancer::Ansi::Parser v0.0.1 {
         length($b) > 0 && ord( substr( $b, 0, 1 ) ) == 0x1B;
     }
     #
-    sub DecodeSequence ( $bytes, $state, $parser ) {
+    # $pos lets callers walk a buffer without re-slicing it after every
+    # sequence (Perl strings copy on substr-assign, which makes the classic
+    # chop-per-sequence loop quadratic). All returned byte counts are
+    # relative to $pos, mirroring Go's zero-copy slice semantics.
+    sub DecodeSequence ( $bytes, $state, $parser, $pos = 0 ) {
         my $len = length($bytes);
-        for my $i ( 0 .. $len - 1 ) {
+
+        # Prefix view for the Has*Prefix probes: with $pos > 0 they must look
+        # at the start of the current sequence, not the start of the buffer.
+        my $seq_prefix = $pos ? substr( $bytes, $pos, 2 ) : $bytes;
+        for my $i ( $pos .. $len - 1 ) {
             my $c = ord( substr( $bytes, $i, 1 ) );
             if ( $state == NormalState ) {
+
+                # Printable ASCII first: it dominates real payloads and needs
+                # no parser state beyond clearing stale fields.
+                if ( $c > US && $c < DEL ) {
+                    if ( defined $parser && ( $parser->{cmd} || $parser->{paramsLen} || $parser->{dataLen} ) ) {
+                        $parser->{dataLen}   = 0;
+                        $parser->{paramsLen} = 0;
+                        $parser->{cmd}       = 0;
+                    }
+                    return ( substr( $bytes, $i, 1 ), 1, $i - $pos + 1, NormalState );
+                }
                 if ( $c == ESC ) {
                     if ( defined $parser ) {
                         $parser->{params}[0] = MissingParam if @{ $parser->{params} };
@@ -789,19 +808,21 @@ package Cancer::Ansi::Parser v0.0.1 {
                     $state = DecodeStringState;
                     next;
                 }
-                if ( defined $parser ) {
+                if ( $c <= US || $c == DEL || $c < 0xC0 ) {
+                    if ( defined $parser && ( $parser->{cmd} || $parser->{paramsLen} || $parser->{dataLen} ) ) {
+                        $parser->{dataLen}   = 0;
+                        $parser->{paramsLen} = 0;
+                        $parser->{cmd}       = 0;
+                    }
+                    return ( substr( $bytes, $i, 1 ), 0, $i - $pos + 1, NormalState );
+                }
+
+                # Check if it starts a UTF-8 multi-byte sequence
+                if ( defined $parser && ( $parser->{cmd} || $parser->{paramsLen} || $parser->{dataLen} ) ) {
                     $parser->{dataLen}   = 0;
                     $parser->{paramsLen} = 0;
                     $parser->{cmd}       = 0;
                 }
-                if ( $c > US && $c < DEL ) {
-                    return ( substr( $bytes, $i, 1 ), 1, 1, NormalState );
-                }
-                if ( $c <= US || $c == DEL || $c < 0xC0 ) {
-                    return ( substr( $bytes, $i, 1 ), 0, 1, NormalState );
-                }
-
-                # Check if it starts a UTF-8 multi-byte sequence
                 if ( ( $c & 0xC0 ) == 0xC0 ) {
                     my $clen = utf8_byte_len($c);
                     if ( $clen > 1 && $i + $clen <= $len ) {
@@ -815,7 +836,7 @@ package Cancer::Ansi::Parser v0.0.1 {
                     # Incomplete UTF-8, return the lone start byte
                     return ( substr( $bytes, $i, 1 ), 0, 1, NormalState );
                 }
-                return ( substr( $bytes, 0, $i ), 0, $i, NormalState );
+                return ( substr( $bytes, $pos, $i - $pos ), 0, $i - $pos, NormalState );
             }
             if ( $state == DecodePrefixState ) {
                 if ( $c >= ord('<') && $c <= ord('?') ) {
@@ -877,16 +898,16 @@ package Cancer::Ansi::Parser v0.0.1 {
                         $parser->{cmd} &= ~0xff;
                         $parser->{cmd} |= $c;
                     }
-                    if ( HasDcsPrefix($bytes) ) {
+                    if ( HasDcsPrefix($seq_prefix) ) {
                         if ( defined $parser ) {
                             $parser->{dataLen} = 0;
                         }
                         $state = DecodeStringState;
                         next;
                     }
-                    return ( substr( $bytes, 0, $i + 1 ), 0, $i + 1, NormalState );
+                    return ( substr( $bytes, $pos, $i - $pos + 1 ), 0, $i - $pos + 1, NormalState );
                 }
-                return ( substr( $bytes, 0, $i ), 0, $i, NormalState );
+                return ( substr( $bytes, $pos, $i - $pos ), 0, $i - $pos, NormalState );
             }
             if ( $state == DecodeEscapeState ) {
                 if ( $c == ord('[') || $c == ord('P') ) {
@@ -918,44 +939,44 @@ package Cancer::Ansi::Parser v0.0.1 {
                         $parser->{cmd} &= ~0xff;
                         $parser->{cmd} |= $c;
                     }
-                    return ( substr( $bytes, 0, $i + 1 ), 0, $i + 1, NormalState );
+                    return ( substr( $bytes, $pos, $i - $pos + 1 ), 0, $i - $pos + 1, NormalState );
                 }
-                return ( substr( $bytes, 0, $i ), 0, $i, NormalState );
+                return ( substr( $bytes, $pos, $i - $pos ), 0, $i - $pos, NormalState );
             }
             if ( $state == DecodeStringState ) {
-                if ( $c == BEL && HasOscPrefix($bytes) ) {
+                if ( $c == BEL && HasOscPrefix($seq_prefix) ) {
                     _parse_osc_cmd($parser);
-                    return ( substr( $bytes, 0, $i + 1 ), 0, $i + 1, NormalState );
+                    return ( substr( $bytes, $pos, $i - $pos + 1 ), 0, $i - $pos + 1, NormalState );
                 }
-                if ( ( $c == CAN || $c == SUB ) && HasOscPrefix($bytes) ) {
+                if ( ( $c == CAN || $c == SUB ) && HasOscPrefix($seq_prefix) ) {
                     _parse_osc_cmd($parser);
-                    return ( substr( $bytes, 0, $i ), 0, $i, NormalState );
+                    return ( substr( $bytes, $pos, $i - $pos ), 0, $i - $pos, NormalState );
                 }
                 if ( $c == ST ) {
-                    if ( HasOscPrefix($bytes) ) {
+                    if ( HasOscPrefix($seq_prefix) ) {
                         _parse_osc_cmd($parser);
                     }
-                    return ( substr( $bytes, 0, $i + 1 ), 0, $i + 1, NormalState );
+                    return ( substr( $bytes, $pos, $i - $pos + 1 ), 0, $i - $pos + 1, NormalState );
                 }
                 if ( $c == ESC ) {
                     if ( HasStPrefix( substr( $bytes, $i ) ) ) {
-                        if ( HasOscPrefix($bytes) ) {
+                        if ( HasOscPrefix($seq_prefix) ) {
                             _parse_osc_cmd($parser);
                         }
-                        return ( substr( $bytes, 0, $i + 2 ), 0, $i + 2, NormalState );
+                        return ( substr( $bytes, $pos, $i + 2 - $pos ), 0, $i + 2 - $pos, NormalState );
                     }
-                    return ( substr( $bytes, 0, $i ), 0, $i, NormalState );
+                    return ( substr( $bytes, $pos, $i - $pos ), 0, $i - $pos, NormalState );
                 }
                 if ( defined $parser && $parser->{dataLen} < length( $parser->{data} ) ) {
                     substr( $parser->{data}, $parser->{dataLen}, 1 ) = chr($c);
                     $parser->{dataLen}++;
-                    if ( $c == ord(';') && HasOscPrefix($bytes) ) {
+                    if ( $c == ord(';') && HasOscPrefix($seq_prefix) ) {
                         _parse_osc_cmd($parser);
                     }
                 }
             }
         }
-        return ( $bytes, 0, $len, $state );
+        return ( substr( $bytes, $pos ), 0, $len - $pos, $state );
     }
 
     sub _parse_osc_cmd ($p) {
@@ -974,7 +995,7 @@ package Cancer::Ansi::Parser v0.0.1 {
 
     # Read a color from SGR params starting at position $i.
     # Returns ( $color_hashref, $params_consumed ).
-    sub _read_style_color ( $params, $i = () ) {
+    sub _read_style_color ( $params, $i = 0 ) {
         my $n_params = scalar @$params;
         return ( undef, 0 ) if $i + 1 >= $n_params;
         my $s          = $params->[$i];          # The 38/48/58 param

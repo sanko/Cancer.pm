@@ -1,0 +1,145 @@
+=encoding utf8
+
+=head1 NAME
+
+Cancer::Lipgloss::Table - Styled table rendering for terminals
+
+=head1 SYNOPSIS
+
+    use Cancer::Lipgloss::Table qw[NewTable HEADER_ROW];
+    use Cancer::Lipgloss qw[NewStyle];
+
+    my $t = NewTable()
+        ->Headers("Name", "Age", "Location")
+        ->Row("Alice", "30", "New York")
+        ->Row("Bob", "25", "London")
+        ->Row("Iris", "102", "Paris")
+        ->StyleFunc(sub {
+            my ($row, $col) = @_;
+            if ($row == HEADER_ROW) {
+                return NewStyle()->bold(1)->underline(1);
+            }
+            return NewStyle()->foreground([200, 200, 200]);
+        });
+
+    print "$t\n";
+
+=head1 DESCRIPTION
+
+A Perl port of C<charmbracelet/lipgloss/table>. Renders styled tables with borders, auto-sizing, header separators,
+custom cell styling, and scroll support.
+
+=head1 FUNCTIONS
+
+=head2 NewTable()
+
+Returns a new table with normal border and default settings.
+
+=head2 DefaultStyles($row, $col)
+
+Returns a default empty style for the given cell position.
+
+=head2 HEADER_ROW
+
+Constant C<-1>. Passed to C<StyleFunc> for header row identification.
+
+=head1 METHODS
+
+=head2 Headers(@headers)
+
+Sets the header row values.
+
+=head2 Row(@cells)
+
+Appends a data row.
+
+=head2 Rows(@rows)
+
+Appends multiple data rows (each is an arrayref).
+
+=head2 Data($data_object)
+
+Sets a custom Data object.
+
+=head2 ClearRows()
+
+Removes all data rows.
+
+=head2 StyleFunc(\&fn)
+
+Sets the style function C<< fn($row, $col) -> Style >>. Use C<HEADER_ROW> for the header row index.
+
+=head2 BaseStyle($style)
+
+Sets the base style inherited by all cells.
+
+=head2 Border($border)
+
+Sets the border type (e.g. C<NormalBorder()>).
+
+=head2 BorderTop($bool), BorderBottom($bool), BorderLeft($bool), BorderRight($bool)
+
+Toggles individual border sides.
+
+=head2 BorderHeader($bool)
+
+Toggles the header separator border.
+
+=head2 BorderColumn($bool)
+
+Toggles column separator borders.
+
+=head2 BorderRow($bool)
+
+Toggles row separator borders.
+
+=head2 BorderStyle($style)
+
+Sets the style applied to all border characters.
+
+=head2 Width($n)
+
+Sets the table width. Columns auto-size to fit.
+
+=head2 Height($n)
+
+Sets the table height. Enables scrolling.
+
+=head2 Wrap($bool)
+
+Enables or disables text wrapping in data cells (default: true).
+
+=head2 YOffset($n)
+
+Sets the vertical scroll offset.
+
+=head2 Render()
+
+Returns the rendered table string. Same as stringification.
+
+=head2 GetData()
+
+Returns the underlying L<Cancer::Lipgloss::Table::StringData> object.
+
+=head2 GetHeaders()
+
+Returns the headers arrayref.
+
+=head1 DATA OBJECT
+
+L<Cancer::Lipgloss::Table::StringData> implements the data interface:
+
+    my $data = Cancer::Lipgloss::Table::StringData->new(
+        ["a", "b"],
+        ["c", "d"],
+    );
+    $data->Rows;      # 2
+    $data->Columns;   # 2
+    $data->At(0, 1);  # "b"
+    $data->Append(["e", "f"]);
+
+=head1 SEE ALSO
+
+L<Cancer::Lipgloss>, L<Cancer::Lipgloss::Tree>, L<Cancer::Lipgloss::List>
+
+=cut

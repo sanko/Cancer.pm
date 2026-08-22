@@ -86,7 +86,7 @@ class Cancer::CellBuf::Style v0.0.1 {
         push @codes, 9 if $a & STRIKETHROUGH_ATTR;
 
         if ( $ul_style != NO_UNDERLINE ) {
-            push @codes, 4, $ul_style;
+            push @codes, 4, _ul_style_code($ul_style);
         }
         if ( defined $fg ) {
             push @codes, _color_codes( 38, $fg );
@@ -120,33 +120,115 @@ class Cancer::CellBuf::Style v0.0.1 {
         my $sa = $attrs;
         my $oa = $old->attrs;
         if ( $sa != $oa ) {
-            for my $check (
-                [   BOLD_ATTR,        sub { push @codes, 1 }, FAINT_ATTR,         sub { push @codes, 2 },
-                    ITALIC_ATTR,      sub { push @codes, 3 }, SLOW_BLINK_ATTR,    sub { push @codes, 5 },
-                    RAPID_BLINK_ATTR, sub { push @codes, 6 }, REVERSE_ATTR,       sub { push @codes, 7 },
-                    CONCEAL_ATTR,     sub { push @codes, 8 }, STRIKETHROUGH_ATTR, sub { push @codes, 9 }
-                ]
-            ) {
-                my ( $attr, $set ) = @$check;
-                if ( ( $sa & $attr ) != ( $oa & $attr ) ) {
-                    if ( $sa & $attr ) {
-                        $set->();
-                    }
-                    elsif ( !$is_normal && ( $attr == BOLD_ATTR || $attr == FAINT_ATTR ) ) {
-                        $is_normal = 1;
-                        push @codes, 22;
-                    }
-                    elsif ( !$no_blink && ( $attr == SLOW_BLINK_ATTR || $attr == RAPID_BLINK_ATTR ) ) {
-                        $no_blink = 1;
-                        push @codes, 25;
-                    }
-                }
+
+            # Attribute diffs mirror vendor/x/cellbuf cell.go Style.n: every
+            # attribute emits an explicit on/off code; bold/faint share one
+            # "normal intensity" (22) and the two blinks share one 25.
+            if ( ( $sa & BOLD_ATTR ) != ( $oa & BOLD_ATTR ) ) {
+                if ( $sa & BOLD_ATTR ) { push @codes, 1 }
+                elsif ( !$is_normal ) { $is_normal = 1; push @codes, 22 }
+            }
+            if ( ( $sa & FAINT_ATTR ) != ( $oa & FAINT_ATTR ) ) {
+                if    ( $sa & FAINT_ATTR ) { push @codes, 2 }
+                elsif ( !$is_normal )      { push @codes, 22 }
+            }
+            if ( ( $sa & ITALIC_ATTR ) != ( $oa & ITALIC_ATTR ) ) {
+                push @codes, ( $sa & ITALIC_ATTR ) ? 3 : 23;
+            }
+            if ( ( $sa & SLOW_BLINK_ATTR ) != ( $oa & SLOW_BLINK_ATTR ) ) {
+                if ( $sa & SLOW_BLINK_ATTR ) { push @codes, 5 }
+                elsif ( !$no_blink ) { $no_blink = 1; push @codes, 25 }
+            }
+            if ( ( $sa & RAPID_BLINK_ATTR ) != ( $oa & RAPID_BLINK_ATTR ) ) {
+                if    ( $sa & RAPID_BLINK_ATTR ) { push @codes, 6 }
+                elsif ( !$no_blink )             { push @codes, 25 }
+            }
+            if ( ( $sa & REVERSE_ATTR ) != ( $oa & REVERSE_ATTR ) ) {
+                push @codes, ( $sa & REVERSE_ATTR ) ? 7 : 27;
+            }
+            if ( ( $sa & CONCEAL_ATTR ) != ( $oa & CONCEAL_ATTR ) ) {
+                push @codes, ( $sa & CONCEAL_ATTR ) ? 8 : 28;
+            }
+            if ( ( $sa & STRIKETHROUGH_ATTR ) != ( $oa & STRIKETHROUGH_ATTR ) ) {
+                push @codes, ( $sa & STRIKETHROUGH_ATTR ) ? 9 : 29;
             }
         }
         if ( $ul_style != $old->ul_style ) {
-            push @codes, 4, $ul_style;
+            if    ( $ul_style == NO_UNDERLINE )     { push @codes, 24 }
+            elsif ( $ul_style == SINGLE_UNDERLINE ) { push @codes, 4 }
+            else                                    { push @codes, "4:$ul_style" }
         }
         return ResetStyle() unless @codes;
+        return SGR(@codes);
+    }
+
+    # Ultraviolet-style diff (uv StyleDiff in charmbracelet/ultraviolet):
+    # unlike the cellbuf diff above there is no "old empty -> full sequence"
+    # shortcut; colors come first, then every reset, then every set.
+    method style_diff ($old) {
+        return ''           if $self->equal($old);
+        return ResetStyle() if $self->empty;
+        my @codes;
+        if ( !_color_eq( $fg, $old->fg ) ) {
+            push @codes, _color_codes( 38, $fg ) if defined $fg;
+            push @codes, 39                      if !defined $fg;
+        }
+        if ( !_color_eq( $bg, $old->bg ) ) {
+            push @codes, _color_codes( 48, $bg ) if defined $bg;
+            push @codes, 49                      if !defined $bg;
+        }
+        if ( !_color_eq( $ul, $old->ul ) ) {
+            push @codes, _color_codes( 58, $ul ) if defined $ul;
+            push @codes, 59                      if !defined $ul;
+        }
+        my $sa              = $attrs;
+        my $oa              = $old->attrs;
+        my $bold_changed    = ( ( $oa & BOLD_ATTR ) != 0 ) != ( ( $sa & BOLD_ATTR ) != 0 );
+        my $faint_changed   = ( ( $oa & FAINT_ATTR ) != 0 ) != ( ( $sa & FAINT_ATTR ) != 0 );
+        my $italic_changed  = ( ( $oa & ITALIC_ATTR ) != 0 ) != ( ( $sa & ITALIC_ATTR ) != 0 );
+        my $blink_changed   = ( ( $oa & SLOW_BLINK_ATTR ) != 0 ) != ( ( $sa & SLOW_BLINK_ATTR ) != 0 );
+        my $rapid_changed   = ( ( $oa & RAPID_BLINK_ATTR ) != 0 ) != ( ( $sa & RAPID_BLINK_ATTR ) != 0 );
+        my $reverse_changed = ( ( $oa & REVERSE_ATTR ) != 0 ) != ( ( $sa & REVERSE_ATTR ) != 0 );
+        my $conceal_changed = ( ( $oa & CONCEAL_ATTR ) != 0 ) != ( ( $sa & CONCEAL_ATTR ) != 0 );
+        my $strike_changed  = ( ( $oa & STRIKETHROUGH_ATTR ) != 0 ) != ( ( $sa & STRIKETHROUGH_ATTR ) != 0 );
+        my $from_ul         = $old->ul_style != NO_UNDERLINE;
+        my $to_ul           = $ul_style != NO_UNDERLINE;
+        my $ul_changed      = $from_ul != $to_ul || $old->ul_style != $ul_style;
+
+        # Resets first, since turning attributes off keeps them independent of
+        # whatever is being set afterwards. Bold/faint share one "normal" (22)
+        # and the blinks share one 25; emitting it marks both as changed so a
+        # pending set still happens.
+        if ( $bold_changed || $faint_changed ) {
+            if ( ( ( $oa & BOLD_ATTR ) && !( $sa & BOLD_ATTR ) ) || ( ( $oa & FAINT_ATTR ) && !( $sa & FAINT_ATTR ) ) ) {
+                push @codes, 22;
+                $bold_changed  = 1;
+                $faint_changed = 1;
+            }
+        }
+        push @codes, 23 if $italic_changed && !( $sa & ITALIC_ATTR );
+        push @codes, 24 if $ul_changed     && !$to_ul;
+        if ( $blink_changed || $rapid_changed ) {
+            if ( ( ( $oa & SLOW_BLINK_ATTR ) && !( $sa & SLOW_BLINK_ATTR ) ) || ( ( $oa & RAPID_BLINK_ATTR ) && !( $sa & RAPID_BLINK_ATTR ) ) ) {
+                push @codes, 25;
+                $blink_changed = 1;
+                $rapid_changed = 1;
+            }
+        }
+        push @codes, 27                        if $reverse_changed && !( $sa & REVERSE_ATTR );
+        push @codes, 28                        if $conceal_changed && !( $sa & CONCEAL_ATTR );
+        push @codes, 29                        if $strike_changed  && !( $sa & STRIKETHROUGH_ATTR );
+        push @codes, 1                         if $bold_changed    && ( $sa & BOLD_ATTR );
+        push @codes, 2                         if $faint_changed   && ( $sa & FAINT_ATTR );
+        push @codes, 3                         if $italic_changed  && ( $sa & ITALIC_ATTR );
+        push @codes, 4                         if $ul_changed      && $to_ul && $ul_style == SINGLE_UNDERLINE;
+        push @codes, 5                         if $blink_changed   && ( $sa & SLOW_BLINK_ATTR );
+        push @codes, 6                         if $rapid_changed   && ( $sa & RAPID_BLINK_ATTR );
+        push @codes, 7                         if $reverse_changed && ( $sa & REVERSE_ATTR );
+        push @codes, 8                         if $conceal_changed && ( $sa & CONCEAL_ATTR );
+        push @codes, 9                         if $strike_changed  && ( $sa & STRIKETHROUGH_ATTR );
+        push @codes, _ul_style_code($ul_style) if $ul_changed      && $to_ul && $ul_style > SINGLE_UNDERLINE;
+        return '' unless @codes;
         return SGR(@codes);
     }
 
@@ -212,6 +294,13 @@ class Cancer::CellBuf::Style v0.0.1 {
             ( $a->{type} ne 'rgb' || ( $a->{r} == $b->{r} && $a->{g} == $b->{g} && $a->{b} == $b->{b} ) ) &&
             ( $a->{type} ne '256' || $a->{index} == $b->{index} ) &&
             ( $a->{type} ne 'basic' || $a->{code} == $b->{code} );
+    }
+
+    # SGR code for an underline style, mirroring ansi.Style.UnderlineStyle:
+    # single is the bare "4", the rest are colon forms ("4:2" etc.).
+    sub _ul_style_code ($u) {
+        return 4 if $u == SINGLE_UNDERLINE;
+        return "4:$u";
     }
 
     sub _color_codes ( $prefix, $c ) {

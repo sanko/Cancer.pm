@@ -229,6 +229,14 @@ package Cancer::Util v0.0.1 {
         return 1;
     }
 
+    # Width of one extended grapheme cluster. Single code points take the fast
+    # path; multi-code-point clusters (ZWJ emoji, combining marks, RI pairs,
+    # VS16 upgrades) are measured as a whole so they can never be torn apart.
+    sub _cluster_width ($tok) {
+        return _char_width( ord($tok) ) if length($tok) == 1;
+        return _calc_width_grapheme($tok);
+    }
+
     sub visual_width ($str) {
         return 0 if !defined $str;
         my $clean = $str;
@@ -343,7 +351,12 @@ package Cancer::Util v0.0.1 {
         my $current_width = 0;
         my $result        = '';
         my $in_escape     = 0;
-        for my $char ( split //, $str ) {
+
+        # \X iterates whole extended grapheme clusters; ANSI escapes are pure
+        # ASCII so each of their bytes still arrives as its own cluster and the
+        # state machine below works unchanged.
+        while ( $str =~ /(\X)/gc ) {
+            my $char = $1;
             if ($in_escape) {
                 $result .= $char;
                 $in_escape = 0 if $char =~ /[a-zA-Z~]/;
@@ -354,7 +367,7 @@ package Cancer::Util v0.0.1 {
                 $in_escape = 1;
                 next;
             }
-            my $w = _char_width( ord $char );
+            my $w = _cluster_width($char);
             last if ( $current_width + $w ) > $max_width;
             $result .= $char;
             $current_width += $w;
@@ -386,13 +399,25 @@ package Cancer::Util v0.0.1 {
                 $pos++;
                 next;
             }
+            pos($str) = $pos;
+            my $cluster = ( $str =~ /\G(\X)/gc ) ? $1 : undef;
             if ($ignoring) {
+                if ( defined $cluster ) {
+                    $pos += length $cluster;
+                }
+                else {
+                    $pos++;
+                }
+                next;
+            }
+            if ( !defined $cluster ) {
+                $out .= $c;
                 $pos++;
                 next;
             }
-            $out .= $c;
-            $cur += _char_width( ord $c );
-            $pos++;
+            $out .= $cluster;
+            $cur += _cluster_width($cluster);
+            $pos += length $cluster;
             if ( $cur >= $width ) {
                 $ignoring = 1;
             }
@@ -516,7 +541,12 @@ package Cancer::Util v0.0.1 {
         my $ignoring = 0;
         my $state    = 0;
 
-        for my $ch ( split //, $str ) {
+        # \X iterates whole extended grapheme clusters so combining marks,
+        # ZWJ emoji sequences, etc. are never torn apart. ANSI escape bytes are
+        # pure ASCII, so each still arrives as its own cluster for the state
+        # machine below.
+        while ( $str =~ /(\X)/gc ) {
+            my $ch = $1;
             if ( $state == 3 ) {
                 $result .= $ch;
                 if    ( $ch eq "\a" ) { $state = 0; }
@@ -551,7 +581,7 @@ package Cancer::Util v0.0.1 {
             if ($ignoring) {
                 next;
             }
-            my $w = _char_width( ord($ch) );
+            my $w = _cluster_width($ch);
             if ( $cw + $w > $avail ) {
                 $ignoring = 1;
                 $result .= $tail;
@@ -570,9 +600,11 @@ package Cancer::Util v0.0.1 {
         my $cw       = 0;
         my $ignoring = 1;
         my $state    = 0;
-        my @chars    = split //, $str;
-        for my $i ( 0 .. $#chars ) {
-            my $ch = $chars[$i];
+
+        # \X iterates whole extended grapheme clusters; see truncate().
+        while ( $str =~ /(\X)/gc ) {
+            my $ch       = $1;
+            my $tok_from = pos($str) - length($ch);
             if ( $state == 3 ) {
                 $result .= $ch;
                 if    ( $ch eq "\a" ) { $state = 0; }
@@ -597,7 +629,7 @@ package Cancer::Util v0.0.1 {
                 next;
             }
             if ( !$ignoring ) {
-                $result .= substr( $str, $i );
+                $result .= substr( $str, $tok_from );
                 last;
             }
             if ( $ch eq "\n" ) {
@@ -606,7 +638,7 @@ package Cancer::Util v0.0.1 {
             if ( $ch eq "\t" ) {
                 next;
             }
-            my $w = _char_width( ord($ch) );
+            my $w = _cluster_width($ch);
             $cw += $w;
             if ( $cw > $width ) {
                 $ignoring = 0;
@@ -633,7 +665,10 @@ package Cancer::Util v0.0.1 {
         my $g_stop  = 0;
         my $found   = 0;
 
-        for my $ch ( split //, $str ) {
+        # \X iterates whole extended grapheme clusters, so the returned range
+        # indexes real graphemes rather than raw code points.
+        while ( $str =~ /(\X)/gc ) {
+            my $ch   = $1;
             my $blen = length( Encode::encode( 'UTF-8', $ch ) );
             if ( $b_pos + $blen > $byte_start && !$found ) {
                 $g_start = $gpos;
@@ -671,7 +706,10 @@ package Cancer::Util v0.0.1 {
         my $width         = 0;
         my $state         = 0;
         my $force_newline = 0;
-        for my $ch ( split //, $str ) {
+
+        # \X iterates whole extended grapheme clusters; see truncate().
+        while ( $str =~ /(\X)/gc ) {
+            my $ch = $1;
             if ( $state == 3 ) {
                 $line .= $ch;
                 if    ( $ch eq "\a" ) { $state = 0; }
@@ -695,8 +733,8 @@ package Cancer::Util v0.0.1 {
                 $state = 1;
                 next;
             }
-            if ( $ch eq "\n" ) {
-                $result .= $line . "\n";
+            if ( $ch eq "\n" or $ch eq "\r\n" ) {
+                $result .= $line . $ch;
                 $line          = '';
                 $width         = 0;
                 $force_newline = 0;
@@ -718,7 +756,7 @@ package Cancer::Util v0.0.1 {
                 $width++ if $o >= 0x20;
             }
             else {
-                my $w = _char_width($o);
+                my $w = _cluster_width($ch);
                 if ( $width + $w > $limit ) {
                     $result .= $line . "\n";
                     $line  = '';
@@ -743,7 +781,9 @@ package Cancer::Util v0.0.1 {
         my $sp_width   = 0;
         my $state      = 0;
 
-        for my $ch ( split //, $str ) {
+        # \X iterates whole extended grapheme clusters; see truncate().
+        while ( $str =~ /(\X)/gc ) {
+            my $ch = $1;
             if ( $state == 3 ) {
                 $word .= $ch;
                 if    ( $ch eq "\a" ) { $state = 0; }
@@ -767,7 +807,7 @@ package Cancer::Util v0.0.1 {
                 $state = 1;
                 next;
             }
-            if ( $ch eq "\n" ) {
+            if ( $ch eq "\n" or $ch eq "\r\n" ) {
                 if ( $word_width == 0 ) {
                     if ( $line_width + $sp_width > $limit ) {
                         $line_width = 0;
@@ -778,7 +818,7 @@ package Cancer::Util v0.0.1 {
                     $space    = '';
                     $sp_width = 0;
                 }
-                $result .= $word . "\n";
+                $result .= $word . $ch;
                 $word       = '';
                 $word_width = 0;
                 $space      = '';
@@ -786,7 +826,7 @@ package Cancer::Util v0.0.1 {
                 $line_width = 0;
                 next;
             }
-            my $w = _char_width( ord($ch) );
+            my $w = _cluster_width($ch);
             if ( _is_ws($ch) && $w > 0 ) {
                 if ( $word_width > 0 ) {
                     $line_width += $sp_width;
@@ -843,7 +883,9 @@ package Cancer::Util v0.0.1 {
         my $sp_width   = 0;
         my $state      = 0;
 
-        for my $ch ( split //, $str ) {
+        # \X iterates whole extended grapheme clusters; see truncate().
+        while ( $str =~ /(\X)/gc ) {
+            my $ch = $1;
             if ( $state == 3 ) {
                 $word .= $ch;
                 if    ( $ch eq "\a" ) { $state = 0; }
@@ -867,7 +909,7 @@ package Cancer::Util v0.0.1 {
                 $state = 1;
                 next;
             }
-            if ( $ch eq "\n" ) {
+            if ( $ch eq "\n" or $ch eq "\r\n" ) {
                 if ( $word_width == 0 ) {
                     if ( $line_width + $sp_width > $width ) {
                         $line_width = 0;
@@ -886,8 +928,7 @@ package Cancer::Util v0.0.1 {
                 $line_width = 0;
                 next;
             }
-            my $o = ord($ch);
-            my $w = $o < 0x80 ? 1 : _char_width($o);
+            my $w = _cluster_width($ch);
             if ( _is_ws($ch) ) {
                 if ( $word_width > 0 ) {
                     $line_width += $sp_width;

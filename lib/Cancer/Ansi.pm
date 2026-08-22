@@ -2,6 +2,7 @@ use v5.42;
 
 package Cancer::Ansi v0.0.1 {
     use Exporter qw[import];
+    use Encode;
     use MIME::Base64;
     use Cancer::Util qw[_to6cube _dist_sq];
     our %EXPORT_TAGS = (
@@ -348,6 +349,10 @@ package Cancer::Ansi v0.0.1 {
 
     # Strip removes ANSI escape codes from a string
     sub Strip ($s) {
+
+        # FAST PATH: every pattern below requires an ESC byte; skip all six
+        # regex passes when there is none.
+        return $s if index( $s, "\e" ) == -1;
         $s =~ s/\e\[[\x30-\x3f]*[\x20-\x2f]*[\x40-\x7e]//g;    # CSI sequences
         $s =~ s/\e\][^\a\x1b]*(?:\a|\x1b\\)//g;                # OSC sequences
         $s =~ s/\e\[[^\x40-\x7e\x1b]*//g;                      # Incomplete CSI
@@ -720,6 +725,8 @@ package Cancer::Ansi v0.0.1 {
     # Wrap wraps text to a given width, breaking words only if necessary
     sub Wrap ( $s, $limit, $breakpoints = '' ) {
         return $s if $limit < 1;
+        my $was_utf8 = utf8::is_utf8($s);
+        $s = Encode::encode( 'UTF-8', $s ) if $was_utf8;
         my $out       = '';
         my $word      = '';
         my $space     = '';
@@ -811,6 +818,7 @@ package Cancer::Ansi v0.0.1 {
             $i += $bytes;
         }
         $add_word->();
+        $out = Encode::decode( 'UTF-8', $out ) if $was_utf8;
         return $out;
     }
 
@@ -821,6 +829,9 @@ package Cancer::Ansi v0.0.1 {
         my $tw = StringWidth($tail);
         $length -= $tw;
         return $tail if $length < 0;
+        my $was_utf8 = utf8::is_utf8($s);
+        $s    = Encode::encode( 'UTF-8', $s )    if $was_utf8;
+        $tail = Encode::encode( 'UTF-8', $tail ) if $was_utf8 && length($tail);
         my $out      = '';
         my $width    = 0;
         my $len      = length($s);
@@ -861,6 +872,7 @@ package Cancer::Ansi v0.0.1 {
             }
             $i += $bytes;
         }
+        $out = Encode::decode( 'UTF-8', $out ) if $was_utf8;
         return $out;
     }
 
