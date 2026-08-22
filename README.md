@@ -11,9 +11,8 @@ use Cancer;
 
 # DESCRIPTION
 
-Cancer is a collection of modules for building rich text terminal user
-interfaces: ANSI-aware string processing, color blending, cell buffers, and a
-Perl port of [Charm Lipgloss](https://github.com/charmbracelet/lipgloss).
+Cancer is a collection of modules for building rich text terminal user interfaces: ANSI-aware string processing, color
+blending, cell buffers, and a Perl port of [Charm Lipgloss](https://github.com/charmbracelet/lipgloss).
 
 The distribution is organized around these packages:
 
@@ -21,9 +20,9 @@ The distribution is organized around these packages:
 - [Cancer::CellBuf::Writer](https://metacpan.org/pod/Cancer%3A%3ACellBuf%3A%3AWriter) - cell buffer rendering and downsampling.
 - [Cancer::Color::Blend](https://metacpan.org/pod/Cancer%3A%3AColor%3A%3ABlend) - color space math (CIELAB, HSL, HSV).
 - [Cancer::CharmTone](https://metacpan.org/pod/Cancer%3A%3ACharmTone) - the CharmTone color palette as constants.
+- [Cancer::Input](https://metacpan.org/pod/Cancer%3A%3AInput) - terminal input parsing: keys, mouse, focus, and terminal responses.
 
-This top level module declares the namespace and currently serves little more
-purpose than existing loudly.
+This top level module declares the namespace and currently serves little more purpose than existing loudly.
 
 # SEE ALSO
 

@@ -26,6 +26,8 @@ The distribution is organized around these packages:
 
 =item L<Cancer::CharmTone> - the CharmTone color palette as constants.
 
+=item L<Cancer::Input> - terminal input parsing: keys, mouse, focus, and terminal responses.
+
 =back
 
 This top level module declares the namespace and currently serves little more purpose than existing loudly.

@@ -156,6 +156,13 @@
          "file" : "lib/Cancer/ColorProfile/Writer.pm",
          "version" : "v0.0.1"
       },
+      "Cancer::Input" : {
+         "file" : "lib/Cancer/Input.pm",
+         "version" : "v0.0.1"
+      },
+      "Cancer::Input::Event" : {
+         "file" : "lib/Cancer/Input.pm"
+      },
       "Cancer::Lipgloss" : {
          "file" : "lib/Cancer/Lipgloss.pm",
          "version" : "v0.0.1"

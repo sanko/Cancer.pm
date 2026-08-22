@@ -7,8 +7,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-  - Initial version
-
-[Unreleased]: https://github.com/sanko/Cancer.pm/compare/v0.0.1...HEAD
-[v0.0.1]: https://github.com/sanko/Cancer.pm/releases/tag/v0.0.1
+### Changed
+  - It exists! Well, it's existed for years in bits and pieces and constant rewrites locally but now it exists on CPAN.

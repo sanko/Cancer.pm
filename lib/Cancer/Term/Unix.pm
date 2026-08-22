@@ -6,39 +6,36 @@ package Cancer::Term::Unix v0.0.1 {
     use Cancer::Term::State;
 
     # termios struct layouts per platform
+    #
+    # tcflag_t is a 32-bit "unsigned int" on Linux and the BSDs but a 64-bit
+    # "unsigned long" on Darwin, each field at natural alignment; c_line sits
+    # between lflag and c_cc on the SysV-derived layouts. Sizes cover what the
+    # kernel copies for TCGETS/TCSETS (TIOCGETA/TIOCSETA).
     my %LAYOUT = (
-        linux     => { iflag => [ 0, 'S' ], oflag => [ 2, 'S' ], cflag => [ 4, 'S' ], lflag => [ 6, 'S' ], cc => [ 18, 'B' ], size => 60 },
-        darwin    => { iflag => [ 0, 'S' ], oflag => [ 2, 'S' ], cflag => [ 4, 'S' ], lflag => [ 6, 'S' ], cc => [ 16, 'B' ], size => 44 },
-        freebsd   => { iflag => [ 0, 'S' ], oflag => [ 2, 'S' ], cflag => [ 4, 'S' ], lflag => [ 6, 'S' ], cc => [ 16, 'B' ], size => 44 },
-        openbsd   => { iflag => [ 0, 'S' ], oflag => [ 2, 'S' ], cflag => [ 4, 'S' ], lflag => [ 6, 'S' ], cc => [ 16, 'B' ], size => 44 },
-        netbsd    => { iflag => [ 0, 'S' ], oflag => [ 2, 'S' ], cflag => [ 4, 'S' ], lflag => [ 6, 'S' ], cc => [ 16, 'B' ], size => 44 },
-        dragonfly => { iflag => [ 0, 'S' ], oflag => [ 2, 'S' ], cflag => [ 4, 'S' ], lflag => [ 6, 'S' ], cc => [ 16, 'B' ], size => 44 },
-        solaris   => { iflag => [ 0, 'S' ], oflag => [ 2, 'S' ], cflag => [ 4, 'S' ], lflag => [ 6, 'S' ], cc => [ 18, 'B' ], size => 60 }
+        linux     => { iflag => [ 0, 'L' ], oflag => [ 4, 'L' ], cflag => [ 8,  'L' ], lflag => [ 12, 'L' ], cc => [ 17, 'B' ], size => 60 },
+        darwin    => { iflag => [ 0, 'Q' ], oflag => [ 8, 'Q' ], cflag => [ 16, 'Q' ], lflag => [ 24, 'Q' ], cc => [ 32, 'B' ], size => 72 },
+        freebsd   => { iflag => [ 0, 'L' ], oflag => [ 4, 'L' ], cflag => [ 8,  'L' ], lflag => [ 12, 'L' ], cc => [ 16, 'B' ], size => 44 },
+        openbsd   => { iflag => [ 0, 'L' ], oflag => [ 4, 'L' ], cflag => [ 8,  'L' ], lflag => [ 12, 'L' ], cc => [ 16, 'B' ], size => 44 },
+        netbsd    => { iflag => [ 0, 'L' ], oflag => [ 4, 'L' ], cflag => [ 8,  'L' ], lflag => [ 12, 'L' ], cc => [ 16, 'B' ], size => 44 },
+        dragonfly => { iflag => [ 0, 'L' ], oflag => [ 4, 'L' ], cflag => [ 8,  'L' ], lflag => [ 12, 'L' ], cc => [ 16, 'B' ], size => 44 },
+        solaris   => { iflag => [ 0, 'L' ], oflag => [ 4, 'L' ], cflag => [ 8,  'L' ], lflag => [ 12, 'L' ], cc => [ 17, 'B' ], size => 60 }
     );
     my $L = $LAYOUT{$^O} // $LAYOUT{linux};
 
-    # termios flag constants
-    use constant {
-        _IGNBRK => 0x0001,
-        _BRKINT => 0x0002,
-        _PARMRK => 0x0008,
-        _ISTRIP => 0x0010,
-        _INLCR  => 0x0020,
-        _IGNCR  => 0x0040,
-        _ICRNL  => 0x0080,
-        _IXON   => 0x0400,
-        _OPOST  => 0x0001,
-        _ECHO   => 0x0008,
-        _ECHONL => 0x0010,
-        _ICANON => 0x0020,
-        _ISIG   => 0x0040,
-        _IEXTEN => 0x0100,
-        _CSIZE  => 0x0030,
-        _PARENB => 0x0100,
-        _CS8    => 0x0030,
-        _VMIN   => 6,
-        _VTIME  => 5
-    };
+    # termios cc indices
+    use constant { _VMIN => 6, _VTIME => 5 };
+
+    # Flag bits come in two ABI families covering every supported OS -- SysV
+    # derived (linux, solaris) and BSD derived (darwin, *bsd); input/output
+    # bits match between them except IXON. Values are from each platform's
+    # <sys/termios.h> as captured by Go's generated syscall tables.
+    my $bsd_flags = $^O =~ /^(?:darwin|freebsd|openbsd|netbsd|dragonfly)\z/;
+    my ( $IGNBRK, $BRKINT, $PARMRK, $ISTRIP, $INLCR, $IGNCR, $ICRNL ) = ( 0x0001, 0x0002, 0x0008, 0x0020, 0x0040, 0x0080, 0x0100 );
+    my $IXON  = $bsd_flags ? 0x0200 : 0x0400;
+    my $OPOST = 0x0001;
+    my ( $ECHO, $ECHONL, $ICANON, $ISIG, $IEXTEN )
+        = $bsd_flags ? ( 0x0008, 0x0010, 0x0100, 0x0080, 0x0400 ) : ( 0x0008, 0x0040, 0x0002, 0x0001, 0x8000 );
+    my ( $CSIZE, $PARENB, $CS8 ) = $bsd_flags ? ( 0x0300, 0x1000, 0x0300 ) : ( 0x0030, 0x0100, 0x0030 );
 
     # ioctl numbers
     my ( $IOCTL_READ, $IOCTL_WRITE, $IOCTL_WINSZ );
@@ -122,21 +119,25 @@ package Cancer::Term::Unix v0.0.1 {
             unpack( 'C', substr( $buf, $off, 1 ) );
     }
 
-    sub _t_set ( $buf, $field, $val ) {
-        my ( $off, $type ) = @{ $L->{$field} };
-        if    ( $type eq 'S' ) { substr( $buf, $off, 2 ) = pack( 'S', $val ) }
-        elsif ( $type eq 'L' ) { substr( $buf, $off, 4 ) = pack( 'L', $val ) }
-        else                   { substr( $buf, $off, 1 ) = pack( 'C', $val ) }
-        return $buf;
+    # Field setters mutate their first argument in place (callers pass the
+    # working buffer by value otherwise) and also return it for chaining.
+    # Signatureless on purpose: @_ aliasing is the mutation mechanism, and a
+    # signature would both copy $buf and trip the experimental-@_ warning.
+    sub _t_set {
+        my ( $off, $type ) = @{ $L->{ $_[1] } };
+        if    ( $type eq 'S' ) { substr( $_[0], $off, 2 ) = pack( 'S', $_[2] ) }
+        elsif ( $type eq 'L' ) { substr( $_[0], $off, 4 ) = pack( 'L', $_[2] ) }
+        else                   { substr( $_[0], $off, 1 ) = pack( 'C', $_[2] ) }
+        return $_[0];
     }
 
     sub _t_cc ( $buf, $idx ) {
         return unpack( 'C', substr( $buf, $L->{cc}[0] + $idx, 1 ) );
     }
 
-    sub _t_set_cc ( $buf, $idx, $val ) {
-        substr( $buf, $L->{cc}[0] + $idx, 1 ) = pack( 'C', $val );
-        return $buf;
+    sub _t_set_cc {
+        substr( $_[0], $L->{cc}[0] + $_[1], 1 ) = pack( 'C', $_[2] );
+        return $_[0];
     }
     #
     sub is_terminal ( $class, $fd ) {
@@ -158,16 +159,16 @@ package Cancer::Term::Unix v0.0.1 {
         my $new = $old;
 
         # cfmakeraw: clear input flags
-        _t_set( $new, 'iflag', _t_get( $new, 'iflag' ) & ~( _IGNBRK | _BRKINT | _PARMRK | _ISTRIP | _INLCR | _IGNCR | _ICRNL | _IXON ) );
+        _t_set( $new, 'iflag', _t_get( $new, 'iflag' ) & ~( $IGNBRK | $BRKINT | $PARMRK | $ISTRIP | $INLCR | $IGNCR | $ICRNL | $IXON ) );
 
         # clear output flags
-        _t_set( $new, 'oflag', _t_get( $new, 'oflag' ) & ~_OPOST );
+        _t_set( $new, 'oflag', _t_get( $new, 'oflag' ) & ~$OPOST );
 
         # clear local flags
-        _t_set( $new, 'lflag', _t_get( $new, 'lflag' ) & ~( _ECHO | _ECHONL | _ICANON | _ISIG | _IEXTEN ) );
+        _t_set( $new, 'lflag', _t_get( $new, 'lflag' ) & ~( $ECHO | $ECHONL | $ICANON | $ISIG | $IEXTEN ) );
 
         # 8-bit, no parity
-        my $cf = _t_get( $new, 'cflag' ) & ~( _CSIZE | _PARENB ) | _CS8;
+        my $cf = _t_get( $new, 'cflag' ) & ~( $CSIZE | $PARENB ) | $CS8;
         _t_set( $new, 'cflag', $cf );
 
         # blocking read, no timeout
@@ -197,8 +198,8 @@ package Cancer::Term::Unix v0.0.1 {
 
         # Disable echo, enable canonical + signals + CR-to-NL
         my $new = $old;
-        _t_set( $new, 'lflag', _t_get( $new, 'lflag' ) & ~_ECHO | ( _ICANON | _ISIG ) );
-        _t_set( $new, 'iflag', _t_get( $new, 'iflag' ) | _ICRNL );
+        _t_set( $new, 'lflag', _t_get( $new, 'lflag' ) & ~$ECHO | ( $ICANON | $ISIG ) );
+        _t_set( $new, 'iflag', _t_get( $new, 'iflag' ) | $ICRNL );
         _write_termios( $fd, $new );
 
         # Read line, restore on completion

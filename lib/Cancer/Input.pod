@@ -1,0 +1,218 @@
+=encoding utf8
+
+=head1 NAME
+
+Cancer::Input - terminal input parser: keys, mouse, focus, and responses
+
+=head1 SYNOPSIS
+
+    use Cancer::Input qw[new_parser];
+
+    my $p = new_parser('Cancer::Input');
+
+    # Feed raw bytes read from a tty; returns bytes consumed and an event.
+    my ( $n, $event ) = $p->parse_sequence("\e[A");    # ( 3, KeyPressEvent(up) )
+    if ( defined $event ) {
+        print $event->keystroke, "\n" if $event->isa('Cancer::Input::KeyPressEvent');
+    }
+
+    # Windows Console API path: feed INPUT_RECORD hashrefs through shared state.
+    use Cancer::Input qw[new_parser new_win32_state];
+
+    my $p     = new_parser('Cancer::Input');
+    my $state = new_win32_state();
+    my $event = $p->parse_con_input_event(
+        { type => 'key', vkc => 0x41, scan => 30, char => ord('a'), down => 1, cks => 0, repeat => 1 },
+        $state,
+    );
+
+=head1 DESCRIPTION
+
+B<Cancer::Input> is a Perl port of the L<charmbracelet/x/input|https://github.com/charmbracelet/x/input> parser. It
+turns raw terminal input into structured events:
+
+=over
+
+=item * key presses and releases, including the Kitty keyboard protocol, alternate key
+reporting, and associated text;
+
+=item * SGR / normal / urxvt mouse reports: clicks, releases, motion, and wheel events;
+
+=item * focus reporting (C<FocusEvent> / C<BlurEvent>) and bracketed paste
+(C<PasteStartEvent>, C<PasteEndEvent>, C<PasteEvent>);
+
+=item * terminal query responses such as device attributes, mode reports, cursor position,
+color queries, clipboard reads, kitty graphics acknowledgements, and window operations.
+
+=back
+
+The parser is a blessed hashref; it holds no OS resources. Callers own all I/O - read bytes from your filehandle of
+choice and push them through L/parse_sequence>.
+
+On Windows there is a second entry point, L/parse_con_input_event>, which consumes decoded console C<INPUT_RECORD>
+structs instead of byte streams. It shares the same event classes.
+
+=head1 FUNCTIONS
+
+=head2 new_parser
+
+    my $p = new_parser( 'Cancer::Input', $flags );
+
+Creates a parser. C<$flags> is a bit mask of C<FLAG_*> constants described in L</PARSE FLAGS>. With no flags, C<\t>
+reports as C<tab>, C<\r> as C<enter>, and so on; the C<FLAG_CTRL_*> switches report the underlying control codes
+instead.
+
+=head2 flags
+
+    my $flags = $p->flags;
+
+Returns the flag mask the parser was built with.
+
+=head2 parse_sequence
+
+    my ( $n, $event ) = $p->parse_sequence($buf);
+
+Parses the first sequence in C<$buf>. Returns a two element list: the number of bytes consumed and an event object. The
+event is C<undef> when more bytes are needed to complete the sequence. Unknown sequences produce an C<UnknownEvent>
+carrying the raw bytes.
+
+=head2 build_keys_table
+
+    my %table = %{ build_keys_table( $flags, $term ) };
+
+Builds the escape-sequence-to-key lookup table used by L/parse_sequence>, honoring the C<FLAG_*> compatibility
+switches. Keys are hashrefs like C<< { code => ..., mod => ... } >>; alt-prefixed sequences map to the same key with
+C<MOD_ALT> added.
+
+=head2 new_win32_state
+
+    my $state = new_win32_state();
+
+Returns a fresh state hashref for the Windows console driver path (see L</WINDOWS CONSOLE INPUT>). One state should be
+shared by every record fed from a given console session; it tracks pending UTF-16 surrogate halves, partially received
+ANSI sequences, the previous control-key state, previous mouse button state, and the last reported window size.
+
+=head1 PARSE FLAGS
+
+    FLAG_CTRL_AT            \0 reports as ctrl+@ instead of ctrl+space
+    FLAG_CTRL_I             \t reports as ctrl+i instead of tab
+    FLAG_CTRL_M             \r reports as ctrl+m instead of enter
+    FLAG_CTRL_OPEN_BRACKET  \e reports as ctrl+[ instead of esc
+    FLAG_BACKSPACE          \x7f reports as delete instead of backspace
+    FLAG_FIND               home key reports as find (legacy xterm)
+    FLAG_SELECT             end key reports as select (legacy xterm)
+    FLAG_TERMINFO           accepted for parity; terminfo resolution not yet implemented (no-op)
+    FLAG_FKEYS              accepted for parity; F13-F63 preservation not yet implemented (no-op)
+    FLAG_MOUSE_MODE         driver hint for enabling mouse mode on Windows only; never checked by parse_sequence
+
+=head1 EVENTS
+
+All events are objects in the C<Cancer::Input::Event> hierarchy with read-only accessors. Key and mouse events provide
+C<string()> rendering; key events also provide C<keystroke()>.
+
+=head2 Key events
+
+C<KeyPressEvent> and C<KeyReleaseEvent> expose C<text>, C<mod>, C<code>, C<shifted_code>, C<base_code>, and
+C<is_repeat>. C<code> is a rune or one of the C<KEY_*> extended codes; C<mod> is a bitmask of C<MOD_*> constants. A
+single read may produce a C<MultiEvent> (accessor C<events>) holding repeats or combined reports.
+
+=head2 Mouse events
+
+C<MouseClickEvent>, C<MouseReleaseEvent>, C<MouseMotionEvent>, and C<MouseWheelEvent> expose C<x>, C<y>, C<button> (a
+C<MOUSE_*> constant), and C<mod>.
+
+=head2 Focus, paste, and misc
+
+C<FocusEvent>, C<BlurEvent>, C<PasteStartEvent>, C<PasteEndEvent>, C<PasteEvent> (C<content>), C<UnknownEvent>
+(C<bytes>).
+
+=head2 Terminal responses
+
+C<CursorPositionEvent> (C<x y>), C<WindowOpEvent> (C<op args>), C<ModeReportEvent> (C<mode value dec>),
+C<PrimaryDeviceAttributesEvent> (C<attrs>), C<KittyEnhancementsEvent> (C<flags>), C<ModifyOtherKeysEvent> (C<value>),
+C<TerminalVersionEvent> (C<version>), C<ClipboardEvent> (C<selection content>), C<ForegroundColorEvent>,
+C<BackgroundColorEvent>, and C<CursorColorEvent> (each C<color> as an RGBA arrayref, plus C<string()> hex output and
+C<is_dark()>), C<CapabilityEvent> (C<value>), C<KittyGraphicsEvent> (C<options payload>), and C<WindowSizeEvent>
+(C<width height>).
+
+=head1 WINDOWS CONSOLE INPUT
+
+L<parse_con_input_event> dispatches one decoded console C<InputRecord> at a time. Records are plain hashrefs selected
+by their C<type> field:
+
+    { type => 'key',         vkc =>, scan =>, char =>, down => bool, cks =>, repeat => }
+    { type => 'mouse',       x =>, y =>, button_state =>, cks =>, flags => }
+    { type => 'focus',       set => bool }
+    { type => 'window_size', w =>, h => }
+    { type => 'menu' }    # ignored, like the reference implementation
+
+C<vkc> is a virtual-key code (0 for unicode-only records), C<char> is a UTF-16 code unit, C<cks> a C<CKS_*> mask,
+C<button_state> a C<BTN_*> mask whose high word carries signed wheel deltas, and C<flags> an C<EVF_*> mask. Window size
+changes are de-duplicated against the last seen size. Supplementary plane runes arrive as two surrogate-half key
+records and are combined transparently; ANSI responses (such as OSC 11 color reports) arriving as per-byte key records
+are accumulated and parsed once complete. Left and right Shift are distinguished by the virtual scan code (C<0x2A> vs
+C<0x36>) since consoles do not flag right Shift as enhanced; an C<ENHANCED_KEY>-based heuristic remains as a fallback
+for scan-code-less records.
+
+=head2 ControlKeyState constants
+
+    CKS_RIGHT_ALT   0x001   CKS_NUMLOCK    0x020
+    CKS_LEFT_ALT    0x002   CKS_SCROLLLOCK 0x040
+    CKS_RIGHT_CTRL  0x004   CKS_CAPSLOCK   0x080
+    CKS_LEFT_CTRL   0x008   CKS_ENHANCED   0x100
+    CKS_SHIFT       0x010
+
+=head2 MouseEventRecord constants
+
+    BTN_FROM_LEFT_1ST 0x0001   EVF_MOUSE_MOVED  0x0001
+    BTN_RIGHTMOST     0x0002   EVF_DOUBLE_CLICK 0x0002
+    BTN_FROM_LEFT_2ND 0x0004   EVF_WHEELED      0x0004
+    BTN_FROM_LEFT_3RD 0x0008   EVF_HWHEELED     0x0008
+    BTN_FROM_LEFT_4TH 0x0010
+
+AltGr is recognized as left ctrl + right alt.
+
+=head1 CONSTANTS
+
+Exported individually or via tags: C<:all>, C<:flags>, C<:mods>, C<:keys>, C<:kitty>, and C<:mouse>.
+
+=head2 Modifiers
+
+C<MOD_SHIFT>, C<MOD_ALT>, C<MOD_CTRL>, C<MOD_META>, C<MOD_HYPER>, C<MOD_SUPER>, C<MOD_CAPS_LOCK>, C<MOD_NUM_LOCK>,
+C<MOD_SCROLL_LOCK>.
+
+=head2 Keys
+
+C<KEY_BACKSPACE>, C<KEY_TAB>, C<KEY_ENTER>, C<KEY_RETURN>, C<KEY_ESCAPE>, C<KEY_ESC>, C<KEY_SPACE>, C<KEY_EXTENDED>,
+directional keys, keypad keys, function keys C<F1>-C<F63>, lock keys, media keys, volume keys, handed modifier keys,
+and ISO level shift keys.
+
+=head2 Mouse buttons
+
+C<MOUSE_NONE>, C<MOUSE_LEFT>, C<MOUSE_MIDDLE>, C<MOUSE_RIGHT>, C<MOUSE_WHEEL_UP>, C<MOUSE_WHEEL_DOWN>,
+C<MOUSE_WHEEL_LEFT>, C<MOUSE_WHEEL_RIGHT>, C<MOUSE_BACKWARD>, C<MOUSE_FORWARD>, C<MOUSE_BUTTON10>, C<MOUSE_BUTTON11>.
+
+=head2 Kitty protocol
+
+C<KITTY_DISAMBIGUATE_ESCAPE_CODES>, C<KITTY_REPORT_EVENT_TYPES>, C<KITTY_REPORT_ALTERNATE_KEYS>,
+C<KITTY_REPORT_ALL_KEYS_AS_ESCAPE_CODES>, C<KITTY_REPORT_ASSOCIATED_TEXT>.
+
+=head1 SEE ALSO
+
+L<Cancer::Ansi>, L<Cancer::Term>
+
+=head1 LICENSE
+
+This software is Copyright (c) 2026 by Sanko Robinson.
+
+This is free software, licensed under:
+
+  The Artistic License 2.0 (GPL Compatible)
+
+See the F<LICENSE> file for full text.
+
+=head1 AUTHOR
+
+Sanko Robinson  L<https://github.com/sanko>
+
+=cut
